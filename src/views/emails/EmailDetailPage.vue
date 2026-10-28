@@ -17,7 +17,8 @@ const selectedIdx = ref(0)
 const revertState = ref({}) // versionId → 'confirm' | 'pending' | 'success' | { error }
 const deletingVersionId = ref(null)
 
-const emailId = computed(() => String(route.params.id || ''))
+// Only a saved email's own key (email_<asset id>), never another storage key from the URL.
+const emailId = computed(() => { const id = String(route.params.id || ''); return /^email_\d+$/.test(id) ? id : '' })
 
 function load() {
   loading.value = true

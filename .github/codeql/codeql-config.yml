@@ -1,0 +1,7 @@
+# CodeQL: shipped code only. Tests build fake URLs and storage keys on purpose.
+name: Marketing Cloud Toolkit
+paths-ignore:
+  - '**/__tests__/**'
+  - '**/*.test.js'
+  - node_modules
+  - dist

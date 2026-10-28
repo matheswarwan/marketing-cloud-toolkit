@@ -22,7 +22,7 @@ const tone = computed(() => {
 const icon = computed(() => {
   const v = s.value
   if (/error|fail/.test(v)) return CircleX
-  if (/^running|executing|in ?progress/.test(v)) return Loader2
+  if (/(?:^running)|executing|in ?progress/.test(v)) return Loader2
   if (/inactive|stopped/.test(v)) return CircleStop
   if (/paused/.test(v)) return CirclePause
   if (/draft|building|unpublished/.test(v)) return PencilLine

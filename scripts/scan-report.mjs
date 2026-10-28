@@ -57,7 +57,7 @@ Automated scans run by the release workflow. **Not an independent audit.**
 
 | Check | Result |
 |---|---|
-${summarize(dir).map(([a, b]) => `| ${a} | ${String(b).replace(/\|/g, '\\|').replace(/\n/g, ' ')} |`).join('\n')}
+${summarize(dir).map(([a, b]) => `| ${a} | ${String(b).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ')} |`).join('\n')}
 
 Tools:
 ${tools}

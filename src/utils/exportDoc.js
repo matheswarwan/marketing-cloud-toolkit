@@ -30,7 +30,7 @@ function footer(now) {
 
 // ── Markdown ───────────────────────────────────────────────
 function mdCell(v) {
-  return str(v).replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>')
+  return str(v).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>')
 }
 
 function mdTable(columns, rows) {
