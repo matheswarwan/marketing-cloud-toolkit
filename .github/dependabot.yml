@@ -1,10 +1,13 @@
 # Dependabot (security review, Phase 5): weekly updates for npm dependencies (the
-# extension and the share worker) and for the pinned GitHub Actions SHAs.
+# extension and the share worker) and for the pinned GitHub Actions SHAs. A release
+# is proposed only after it has been out for 7 days (cooldown), so a compromised
+# package version has time to be found and pulled first.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     open-pull-requests-limit: 5
     groups:
       dev-tools:
@@ -12,6 +15,8 @@ updates:
   - package-ecosystem: npm
     directory: /workers/share
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
