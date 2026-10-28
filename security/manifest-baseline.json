@@ -1,0 +1,74 @@
+{
+  "permissions": [
+    "cookies",
+    "storage",
+    "webRequest"
+  ],
+  "optional_permissions": [
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://*.exacttarget.com/*",
+    "https://*.marketingcloud.com/*",
+    "https://*.marketingcloudapps.com/*",
+    "https://*.salesforce-marketingcloud.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://*.herokuapp.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://*.exacttarget.com https://*.marketingcloudapps.com https://*.marketingcloud.com https://*.salesforce-marketingcloud.com https://sfmc-share-worker.mathes-btech.workers.dev https://query-saver-feedback.mathes-btech.workers.dev data: blob:"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.exacttarget.com/*",
+        "https://*.marketingcloud.com/*",
+        "https://*.marketingcloudapps.com/*",
+        "https://*.salesforce-marketingcloud.com/*"
+      ],
+      "js": [
+        "content.js",
+        "automationPanel.js",
+        "dashboardPanel.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://sfmc-share-worker.mathes-btech.workers.dev/share/*"
+      ],
+      "js": [
+        "share-handler.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "externally_connectable": null,
+  "web_accessible_resources": null,
+  "managed_schema": "managed_schema.json",
+  "sourceHosts": [
+    "*.exacttarget.com",
+    "*.herokuapp.com",
+    "*.marketingcloud.com",
+    "*.marketingcloudapps.com",
+    "*.salesforce-marketingcloud.com",
+    "cloud-pages.*.marketingcloudapps.com",
+    "content-builder.*.marketingcloudapps.com",
+    "developer.salesforce.com",
+    "diagramforce.com",
+    "jbinteractions.*.marketingcloudapps.com",
+    "mateuszdabrowski.pl",
+    "mc-data-ui.*.marketingcloudapps.com",
+    "mc.*.exacttarget.com",
+    "mc.*.marketingcloudapps.com",
+    "mc.exacttarget.com",
+    "query-saver-feedback.mathes-btech.workers.dev",
+    "schemas.openxmlformats.org",
+    "sfmc-share-worker.mathes-btech.workers.dev",
+    "www.linkedin.com",
+    "www.w3.org"
+  ]
+}
