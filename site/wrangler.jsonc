@@ -1,0 +1,11 @@
+{
+  // Static pages for Marketing Cloud Toolkit: the privacy policy the Chrome Web Store
+  // listing links to. PRIVACY.md is the source (npm run privacy, from the repository
+  // root, writes site/public/privacy.html). Deploy from this folder with
+  //   CLOUDFLARE_ACCOUNT_ID=<account id> npx wrangler deploy
+  "name": "marketing-cloud-toolkit-site",
+  "compatibility_date": "2026-10-01",
+  "routes": [{ "pattern": "marketing-cloud-toolkit.mathes.dev", "custom_domain": true }],
+  "workers_dev": false,
+  "assets": { "directory": "./public", "html_handling": "drop-trailing-slash", "not_found_handling": "404-page" }
+}

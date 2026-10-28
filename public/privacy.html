@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marketing Cloud Toolkit privacy policy</title>
+<style>
+  :root { color-scheme: light dark; --fg: #1a1f2b; --muted: #5b6475; --bg: #ffffff; --line: #e3e6ec; --link: #0b5cab; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #e8eaee; --muted: #a2a9b6; --bg: #12151c; --line: #2a2f3a; --link: #78b0fd; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 42rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1.1rem; margin: 2rem 0 0.5rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  li { margin: 0.25rem 0; }
+  a { color: var(--link); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Marketing Cloud Toolkit privacy policy</h1>
+  <p>Last updated: 2026-10-28. This policy covers Marketing Cloud Toolkit version 2.0.18 and later, the Chrome extension that was published as SFMC Query Saver until version 1.4.0.</p>
+  <p>Publisher: Matheswaran Kanagarajan, an individual developer. Contact: mathes.btech@gmail.com.</p>
+  <h2>Summary</h2>
+  <ul>
+    <li>The extension works with your own Salesforce Marketing Cloud (SFMC) account, in your browser, with the login you already have. It never asks for or stores a password.</li>
+    <li>There is no analytics, no advertising and no tracking. Nothing is sold.</li>
+    <li>Data leaves your browser only in these cases: calls to Salesforce Marketing Cloud on your behalf; a query you choose to share; feedback you choose to send; and a diagram you choose to open on diagramforce.com. Each is described below.</li>
+  </ul>
+  <h2>What the extension reads in your browser</h2>
+  <ul>
+    <li><strong>Marketing Cloud pages and APIs.</strong> The extension calls Marketing Cloud's own APIs with your existing session to list and show your queries, automations, journeys, data extensions, CloudPages and emails, and to run queries you start.</li>
+    <li><strong>Cookies.</strong> It reads the names and expiry dates of Marketing Cloud login cookies to tell which Marketing Cloud stack you use, and the value of Content Builder's security cookie (<code>_csrf</code>) to send it back with changes you make there. Cookie values are never stored or sent anywhere except back to Marketing Cloud.</li>
+    <li><strong>Security tokens.</strong> Marketing Cloud adds a security token to its own requests; the extension reads it from those requests to send it back with the changes you make (for example, running a query). The Contacts page also reuses the headers Contact Builder's own page sends. These are kept in memory and in the browser's session storage, which is cleared when the browser closes. They are never written to disk by the extension, never logged and never sent anywhere except back to Marketing Cloud.</li>
+    <li><strong>Request bodies, only for features you turn on.</strong> If you turn on Save email versions, Save Query and Script activity versions, or Save Query Studio runs (all off by default), the extension reads the content of those saves as you make them, to keep a copy in your browser.</li>
+  </ul>
+  <h2>What is stored in your browser</h2>
+  <ul>
+    <li>Saved queries and, while Keep query history is on, the SQL of each run. A run also records the data extension and query activity it created in Marketing Cloud, so they can be cleaned up later.</li>
+    <li>If you turn them on: saved email versions (at most 10 per email), saved Query and Script activity versions, and queries you ran in Query Studio.</li>
+    <li>Query Builder drafts, Where used scans (names and SQL of Marketing Cloud items, used to show what depends on what), watched automations and journeys, and your settings.</li>
+    <li><strong>Query results are never stored in your browser.</strong> They stay in Marketing Cloud, in the data extension the query wrote to.</li>
+    <li>Settings &gt; Storage &gt; Clear all deletes everything the extension stores. Removing the extension deletes it too.</li>
+  </ul>
+  <h2>What is sent, and where</h2>
+  <ul>
+    <li><strong>Salesforce Marketing Cloud.</strong> Every call to Marketing Cloud goes to Salesforce's own domains (<code>exacttarget.com</code>, <code>marketingcloudapps.com</code>, <code>marketingcloud.com</code>, <code>salesforce-marketingcloud.com</code>), with your session, to do what you asked. Salesforce's own privacy terms apply to your Marketing Cloud data.</li>
+    <li><strong>Share (off by default).</strong> When you share a query, its name and SQL are sent to the Toolkit's share service (<code>sfmc-share-worker.mathes-btech.workers.dev</code>, run on Cloudflare Workers). Anyone with the link can read it for 24 hours, after which it is deleted. Before anything is sent, the extension shows exactly what will be sent and asks you to confirm. No results, data extension rows or account details are sent. The share service does not store who sent it.</li>
+    <li><strong>Feedback (only when you send it).</strong> The feedback form sends your message, the kind of feedback, the page you were on (without record IDs), the extension version and, only if you fill them in, your name and email. Technical details (browser, language, window size, Marketing Cloud stack and the status codes of recent failed calls) and a screenshot are added only if you choose them; before sending, the form shows exactly what will be sent. Technical details never include business unit names or IDs, SQL, results, record names or Marketing Cloud addresses. Feedback is stored in a Cloudflare D1 database (<code>query-saver-feedback.mathes-btech.workers.dev</code>), read only by the developer, and deleted after 180 days. IP addresses are not stored.</li>
+    <li><strong>Diagramforce (only when you click Open in Diagramforce).</strong> The query's table, column and join names are passed to diagramforce.com, a free diagram editor by Mateusz Dabrowski, in a new tab. That site's own privacy policy applies.</li>
+  </ul>
+  <h2>Controls for organizations</h2>
+  <p>Administrators can turn features off for everyone through Chrome policy (managed storage): local query history and the capture features, Share, the feedback form, technical details in feedback, screenshots in feedback, the Contacts page, and Open in Diagramforce. See <code>docs/enterprise-deployment.md</code> in the source repository.</p>
+  <h2>Retention and deletion</h2>
+  <ul>
+    <li>Data in your browser stays until you delete it (Clear all) or remove the extension.</li>
+    <li>Shared queries are deleted 24 hours after they are created.</li>
+    <li>Feedback is deleted 180 days after it is sent. To have your feedback deleted sooner, or to ask what is held about you, email mathes.btech@gmail.com with the email address you used or the approximate date you sent it.</li>
+  </ul>
+  <h2>What the extension does not do</h2>
+  <ul>
+    <li>It does not sell or transfer your data to third parties, use it for advertising, or use it to determine creditworthiness or for lending.</li>
+    <li>It does not use your data for anything other than the features described here.</li>
+    <li>It does not run code downloaded from anywhere: all code is in the package Chrome installs.</li>
+  </ul>
+  <h2>Earlier versions</h2>
+  <p>Versions before 2.0.18 sent anonymous usage events (for example &quot;app opened&quot; or &quot;query run&quot;, with a random ID and no SQL, names or data) to Google Analytics, sent more technical details with feedback by default (including the business unit name and the paths of recent Marketing Cloud API calls), and stored the IP address of feedback senders. Feedback stored before 2026-10-28 may hold those details until it is deleted after 180 days.</p>
+  <h2>Changes to this policy</h2>
+  <p>Changes are listed in the extension's CHANGELOG and this page's date is updated. Material changes are also mentioned in the extension's What's new notes.</p>
+</main>
+</body>
+</html>

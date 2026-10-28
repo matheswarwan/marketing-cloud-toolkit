@@ -1,0 +1,9 @@
+# Deployed at https://sfmc-share-worker.mathes-btech.workers.dev (Marketing Cloud Toolkit's Share).
+# From this folder: npx wrangler deploy (with CLOUDFLARE_ACCOUNT_ID set).
+name = "sfmc-share-worker"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[[kv_namespaces]]
+binding = "SHARE_KV"
+id = "13dd7a38856d4458867b7aa45763139d"

@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "properties": {
+    "disableHistory": {
+      "title": "Turn off local history",
+      "description": "No run history is kept with saved queries, and the extension never saves Query Studio runs, Content Builder email versions or Automation Studio activity versions, whatever the user's settings say.",
+      "type": "boolean"
+    },
+    "disableShare": {
+      "title": "Turn off query sharing",
+      "description": "Hides Share, so no SQL is ever sent to the share service, and opened share links are not imported.",
+      "type": "boolean"
+    },
+    "disableFeedback": {
+      "title": "Turn off the feedback form",
+      "description": "Hides Send feedback, so nothing is sent to the feedback service.",
+      "type": "boolean"
+    },
+    "disableFeedbackMetadata": {
+      "title": "Turn off technical details in feedback",
+      "description": "The feedback form never offers to include technical details (version, browser, page, error codes).",
+      "type": "boolean"
+    },
+    "disableScreenshots": {
+      "title": "Turn off screenshots in feedback",
+      "description": "The feedback form never offers to attach a screenshot.",
+      "type": "boolean"
+    },
+    "disableContacts": {
+      "title": "Turn off the Contacts page",
+      "description": "Hides Data > Contacts, and the extension stops reading the request headers Contact Builder's own page sends (needed only for that page).",
+      "type": "boolean"
+    },
+    "disableDiagramforce": {
+      "title": "Turn off Open in Diagramforce",
+      "description": "Hides Open in Diagramforce, which sends a query's table and column names to diagramforce.com.",
+      "type": "boolean"
+    }
+  }
+}

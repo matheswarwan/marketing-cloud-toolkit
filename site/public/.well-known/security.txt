@@ -1,0 +1,5 @@
+Contact: mailto:mathes.btech@gmail.com
+Expires: 2027-10-28T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://marketing-cloud-toolkit.mathes.dev/.well-known/security.txt
+Policy: https://marketing-cloud-toolkit.mathes.dev/

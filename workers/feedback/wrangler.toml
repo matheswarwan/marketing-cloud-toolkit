@@ -1,0 +1,17 @@
+# Deployed at https://query-saver-feedback.mathes-btech.workers.dev (the extension posts there).
+# From this folder: CLOUDFLARE_ACCOUNT_ID=<account id> npx wrangler deploy
+name = "query-saver-feedback"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding       = "FEEDBACK_DB"
+database_name = "sfmc-query-saver-feedback"
+database_id   = "5fe5fc22-e6ef-4cf1-97bd-5a19b5599e96"
+
+# Workers Logs off (security review, 2026-10-28): request logs carry the sender's IP.
+[observability]
+enabled = false
+
+# Retention cleanup runs after each post (index.js). The account has used its 5 free
+# cron triggers; with one free, add: [triggers] crons = ["17 3 * * *"]

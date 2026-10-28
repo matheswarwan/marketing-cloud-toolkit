@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "Marketing Cloud Toolkit",
+  "version": "2.0.17",
+  "description": "Run and save SFMC SQL, and explore automations, journeys, data extensions, CloudPages and saved email versions in one place.",
+  "action": {
+    "default_title": "Open Marketing Cloud Toolkit",
+    "default_icon": {
+      "16": "images/icon16x16.png",
+      "32": "images/icon32x32.png",
+      "48": "images/icon48x48.png",
+      "128": "images/icon128x128.png"
+    }
+  },
+  "icons": {
+    "16": "images/icon16x16.png",
+    "32": "images/icon32x32.png",
+    "48": "images/icon48x48.png",
+    "128": "images/icon128x128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "webRequest",
+    "cookies"
+  ],
+  "optional_permissions": [
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://*.exacttarget.com/*",
+    "https://*.marketingcloudapps.com/*",
+    "https://*.marketingcloud.com/*",
+    "https://*.salesforce-marketingcloud.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://*.herokuapp.com/*"
+  ],
+  "storage": {
+    "managed_schema": "managed_schema.json"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://*.exacttarget.com https://*.marketingcloudapps.com https://*.marketingcloud.com https://*.salesforce-marketingcloud.com https://sfmc-share-worker.mathes-btech.workers.dev https://query-saver-feedback.mathes-btech.workers.dev data: blob:"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.exacttarget.com/*",
+        "https://*.marketingcloudapps.com/*",
+        "https://*.marketingcloud.com/*",
+        "https://*.salesforce-marketingcloud.com/*"
+      ],
+      "js": [
+        "content.js",
+        "automationPanel.js",
+        "dashboardPanel.js"
+      ]
+    },
+    {
+      "matches": [
+        "https://sfmc-share-worker.mathes-btech.workers.dev/share/*"
+      ],
+      "js": [
+        "share-handler.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
