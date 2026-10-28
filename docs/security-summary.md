@@ -124,3 +124,14 @@ Set through Chrome policy for the extension (schema `public/managed_schema.json`
 - Dependencies are locked in `package-lock.json`. `npm audit` reports 0 known vulnerabilities (2026-10-28).
 - `xlsx` comes from SheetJS's own CDN at 0.20.3, which has the fixes for GHSA-4r6h-8v6p-xvw6 and GHSA-5pgg-2g8v-p4x9; scanners that compare it with the npm registry still list those advisories by name.
 - Scan results and self-assessments: `security/audits/`.
+
+## Automated checks
+
+Every pull request, push to `main` and tag runs `.github/workflows/checks.yml` (workflow permissions: `contents: read`; CodeQL adds `security-events: write`):
+
+- tests and build; **manifest guard** (`scripts/manifest-guard.mjs`): fails when permissions, host permissions, content script matches or files, the CSP, `externally_connectable`, `web_accessible_resources` or any network host named in shipped source differ from `security/manifest-baseline.json`. The baseline only changes in its own commit, with the reason, for review (`node scripts/manifest-guard.mjs --update`).
+- gitleaks over the full history (`.gitleaks.toml`), semgrep, osv-scanner on both lockfiles, `npm audit` (extension and share worker), retire.js on the built package, CodeQL (`security-extended`).
+- Actions are pinned to commit SHAs and scanner images to digests; Dependabot (`.github/dependabot.yml`) proposes npm and Actions updates weekly.
+
+A `v*` tag runs `.github/workflows/release.yml`: the tag must match the manifest version; tests and scans run again; the zip is built reproducibly; the GitHub release gets the zip, `SHA256SUMS` and the scan report; and a pull request adds `security/scans/<version>.md`. The release job alone has `contents: write` and `pull-requests: write`.
+

@@ -1,0 +1,10 @@
+# gitleaks: the default rules, plus known false positives (security review, 2026-10-28).
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test data: an event definition key, not a secret"
+paths = ['''src/utils/__tests__/journeysCloudPages\.test\.js''']
+regexes = ['''DEAudience-123''']
+condition = "AND"
+regexTarget = "match"

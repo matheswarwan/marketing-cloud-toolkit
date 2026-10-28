@@ -8,7 +8,7 @@ Every report here names the extension version and the git commit it describes. *
 |---|---|---|---|---|
 | 2026-10-28 | 2.0.17 | `c7dc4c3` | Self-assessment (NOT independent) and automated scans | [2026-10-28-self-assessment-2.0.17.md](2026-10-28-self-assessment-2.0.17.md) |
 
-Per-release scan results (built package SHA-256, gitleaks, osv-scanner, retire.js, semgrep, manifest guard) go in `security/scans/<version>.md`, written by the release workflow.
+Per-release scan results (built package SHA-256, gitleaks, osv-scanner, retire.js, semgrep, npm audit, manifest guard) go in `security/scans/<version>.md`, written by the release workflow (`.github/workflows/release.yml`) and added through a pull request. The same checks run on every pull request (`.github/workflows/checks.yml`).
 
 ## Third-party scores
 
