@@ -1,0 +1,17 @@
+# Dependabot (security review, Phase 5): weekly updates for npm dependencies (the
+# extension and the share worker) and for the pinned GitHub Actions SHAs.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      dev-tools:
+        dependency-type: development
+  - package-ecosystem: npm
+    directory: /workers/share
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }

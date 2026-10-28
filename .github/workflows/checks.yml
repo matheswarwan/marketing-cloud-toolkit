@@ -1,0 +1,107 @@
+# Security and quality checks (security review, Phase 5). Runs on every pull request,
+# every push to main and every tag. Actions are pinned to commit SHAs and scanner
+# images to digests; Dependabot proposes updates for the actions.
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  SEMGREP_IMAGE: semgrep/semgrep:1.181.1@sha256:3db5c7af55eb1f512eac0abf0ab69a97b52c74b5e9a27314c221aee1a78d7ab2
+  OSV_IMAGE: ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0
+  RETIRE_VERSION: 5.7.0
+
+jobs:
+  test:
+    name: Tests, build, manifest guard, npm audit, retire.js
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - name: Manifest guard (permissions, hosts, content scripts, CSP, network hosts in source)
+        run: node scripts/manifest-guard.mjs
+      - name: npm audit (extension)
+        run: npm audit --audit-level=moderate
+      - name: npm audit (share worker)
+        working-directory: workers/share
+        run: npm audit --audit-level=moderate
+      - name: retire.js on the built package
+        run: npx --yes retire@${RETIRE_VERSION} --path dist --exitwith 1
+
+  gitleaks:
+    name: gitleaks (full history)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: docker run --rm -v "$PWD:/repo:ro" "$GITLEAKS_IMAGE" git /repo --config /repo/.gitleaks.toml --redact --no-banner --exit-code 1
+
+  osv-scanner:
+    name: osv-scanner (lockfiles)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # xlsx 0.20.3 comes from SheetJS's CDN and has the fixes for these two advisories;
+      # OSV lists every version as affected (docs/security-summary.md, Supply chain).
+      - run: |
+          cat > osv-scanner.toml <<'TOML'
+          [[IgnoredVulns]]
+          id = "GHSA-4r6h-8v6p-xvw6"
+          reason = "xlsx 0.20.3 from cdn.sheetjs.com includes the fix (0.19.3); OSV marks all versions"
+          [[IgnoredVulns]]
+          id = "GHSA-5pgg-2g8v-p4x9"
+          reason = "xlsx 0.20.3 from cdn.sheetjs.com includes the fix (0.20.2); OSV marks all versions"
+          TOML
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/osv-scanner.toml:/osv-scanner.toml:ro" "$OSV_IMAGE" scan source --config /osv-scanner.toml -r /src
+
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: >
+          docker run --rm -v "$PWD:/src:ro" -e SEMGREP_SEND_METRICS=off "$SEMGREP_IMAGE"
+          semgrep scan --metrics=off --error
+          --config p/javascript --config p/secrets --config p/xss --config p/owasp-top-ten
+          --exclude node_modules --exclude dist --exclude '__tests__' /src
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1

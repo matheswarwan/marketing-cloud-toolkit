@@ -1,0 +1,118 @@
+# Release (security review, Phase 5). On a v* tag: check the tag matches the manifest
+# version, run the tests and every scan, build the zip reproducibly, publish a GitHub
+# release with the zip, its SHA-256 and the scan report, and open a pull request that
+# adds security/scans/<version>.md. Publishing to the Chrome Web Store is a separate,
+# approved step (docs/release-process.md).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  SEMGREP_IMAGE: semgrep/semgrep:1.181.1@sha256:3db5c7af55eb1f512eac0abf0ab69a97b52c74b5e9a27314c221aee1a78d7ab2
+  OSV_IMAGE: ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0
+  RETIRE_VERSION: 5.7.0
+
+jobs:
+  build:
+    name: Build, scan and package
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      sha256: ${{ steps.pkg.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - id: v
+        name: Tag must match the manifest version
+        run: |
+          version=$(node -p "require('./public/manifest.json').version")
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME does not match manifest version $version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - name: Scans
+        run: |
+          mkdir -p scan
+          node scripts/manifest-guard.mjs > scan/guard.txt 2>&1 || { cat scan/guard.txt; exit 1; }
+          npm audit --json > scan/audit.json || true
+          (cd workers/share && npm audit --json > ../../scan/audit-share.json) || true
+          docker run --rm -v "$PWD:/repo:ro" -v "$PWD/scan:/out" "$GITLEAKS_IMAGE" git /repo --config /repo/.gitleaks.toml --redact --no-banner -f json -r /out/gitleaks.json --exit-code 0
+          docker run --rm -v "$PWD:/src:ro" "$OSV_IMAGE" scan source -r /src --format json > scan/osv.json || true
+          docker run --rm -v "$PWD:/src:ro" -e SEMGREP_SEND_METRICS=off "$SEMGREP_IMAGE" semgrep scan --metrics=off --json --config p/javascript --config p/secrets --config p/xss --config p/owasp-top-ten --exclude node_modules --exclude dist --exclude '__tests__' /src > scan/semgrep.json || true
+          {
+            echo "gitleaks $(docker run --rm "$GITLEAKS_IMAGE" version)"
+            echo "$(docker run --rm "$OSV_IMAGE" --version | head -1)"
+            echo "semgrep $(docker run --rm "$SEMGREP_IMAGE" semgrep --version)"
+            echo "retire.js $RETIRE_VERSION"
+            echo "node $(node --version), npm $(npm --version), $(zip -v | sed -n 2p | xargs)"
+          } > scan/tools.txt
+      - id: pkg
+        name: Package (reproducible) and SHA-256
+        run: |
+          out="out/marketing-cloud-toolkit-${{ steps.v.outputs.version }}.zip"
+          node scripts/package.mjs --out "$out"
+          npx --yes retire@${RETIRE_VERSION} --path dist --outputformat json --outputpath scan/retire.json || true
+          sha=$(sha256sum "$out" | cut -d' ' -f1)
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          node scripts/scan-report.mjs --version "${{ steps.v.outputs.version }}" --commit "$GITHUB_SHA" --zip "$out" --dir scan
+          cp "security/scans/${{ steps.v.outputs.version }}.md" out/
+          (cd out && sha256sum *.zip > SHA256SUMS)
+      - name: Stop on secrets or vulnerable bundled libraries
+        run: |
+          node -e "const g=require('./scan/gitleaks.json'); if (g.length) { console.error('gitleaks found', g.length); process.exit(1) }"
+          node -e "const r=require('./scan/retire.json'); const n=(r.data||[]).flatMap(f=>(f.results||[]).filter(x=>x.vulnerabilities?.length)).length; if (n) { console.error('retire.js found', n); process.exit(1) }"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: out/
+          if-no-files-found: error
+
+  publish:
+    name: GitHub release and scan report PR
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: out
+      - name: Release notes from CHANGELOG.md
+        run: |
+          v="${{ needs.build.outputs.version }}"
+          awk -v v="$v" '$0 ~ "^## "v" " || $0 ~ "^## Unreleased \\("v"\\)" {on=1; next} on && /^## / {exit} on {print}' CHANGELOG.md > notes.md
+          printf '\n---\nSHA-256 of `marketing-cloud-toolkit-%s.zip`: `%s`\n\nScan report: `%s.md` (attached). Not an independent audit.\n' "$v" "${{ needs.build.outputs.sha256 }}" "$v" >> notes.md
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" out/*.zip out/*.md out/SHA256SUMS --verify-tag --title "Marketing Cloud Toolkit ${{ needs.build.outputs.version }}" --notes-file notes.md
+      - name: Pull request with security/scans/<version>.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ needs.build.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "scans/v$v"
+          mkdir -p security/scans && cp "out/$v.md" "security/scans/$v.md"
+          git add "security/scans/$v.md"
+          git commit -m "Scan report for $v"
+          git push origin "scans/v$v"
+          gh pr create --base main --head "scans/v$v" --title "Scan report for $v" --body "Adds security/scans/$v.md from the release workflow. Fill in the published package check after the Chrome Web Store publishes $v."
