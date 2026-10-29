@@ -21,7 +21,7 @@
 // RETENTION_DAYS are deleted after each new post (the account has no free cron
 // trigger left; `scheduled` does the same if a cron is added later).
 
-const LIMITS = { message: 2000, details: 5000, screen: 200, version: 40, app: 40, kind: 20, name: 100, email: 200, metadata: 20000, screenshot: 1_900_000 }
+const LIMITS = { message: 20000, details: 50000, screen: 200, version: 40, app: 40, kind: 20, name: 100, email: 200, metadata: 20000, screenshot: 1_900_000 }
 const SCREENSHOT_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/
 
 const text = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
