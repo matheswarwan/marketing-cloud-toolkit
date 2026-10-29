@@ -19,7 +19,7 @@ Security and privacy review (October 2026). Details: `docs/security-summary.md`,
 
 **Security:** explicit Content Security Policy; CSRF tokens kept in session storage only; the service worker accepts from content scripts only the messages they use; admin policies through Chrome managed storage (`docs/enterprise-deployment.md`); Saved Emails keeps 10 versions per email. Share service: random 128-bit link ids, size limits, strict page CSP, fix for a stored XSS on the share page. Feedback service: IP addresses no longer stored, technical details trimmed, rows deleted after 180 days.
 
-**Fixed:** #1013 Reorder columns on Data Extensions; #1014 Query Studio 2 no longer tied to one Heroku host name.
+**Fixed:** #1013 Reorder columns on Data Extensions; #1014 Query Studio 2 no longer tied to one Heroku host name; #1015 Saved Activities > Changes uses the same code editor look as Run Query (highlighting, line numbers, changed words marked, unchanged lines folded) and says when lines differ only in spaces or tabs.
 
 **Other:** the creator credit shows the full name (Created by Matheswaran Kanagarajan, Ateko). The source is MIT licensed.
 

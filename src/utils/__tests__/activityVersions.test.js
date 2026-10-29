@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   matchActivitySave, decodeRequestBody, pickActivity, addVersions, makeVersion, recordKey, activityUrl, restoreBody,
-  sideBySideDiff, versionsKeyFor, searchRecords,
+  sideBySideDiff, isSpaceOnlyChange, versionsKeyFor, searchRecords,
   looksLikeActivityId, isBadActivityKey,
 } from '../activityVersions.js'
 import { describeActivity } from '../activityTypes.js'
@@ -236,5 +236,16 @@ describe('path words are not activity ids (feedback #130)', () => {
     expect(isBadActivityKey('activity_script_validate')).toBe(true)
     expect(isBadActivityKey(`activity_query_${guid}`)).toBe(false)
     expect(isBadActivityKey('sql_123')).toBe(false)
+  })
+})
+
+describe('isSpaceOnlyChange', () => {
+  it('flags changed lines that differ only in spaces or tabs', () => {
+    const rows = sideBySideDiff('SELECT a\n  FROM t\nWHERE x = 1', 'SELECT a\n\tFROM  t  \nWHERE x = 2')
+    expect(rows.map(isSpaceOnlyChange)).toEqual([false, true, false])
+  })
+  it('ignores same, added and removed rows', () => {
+    expect(isSpaceOnlyChange({ type: 'added', left: null, right: ' ' })).toBe(false)
+    expect(isSpaceOnlyChange({ type: 'same', left: 'a', right: 'a' })).toBe(false)
   })
 })

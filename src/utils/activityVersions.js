@@ -165,6 +165,13 @@ export function searchRecords(records, text) {
  * view: { left, right, type: 'same' | 'changed' | 'removed' | 'added' }.
  * Texts over 2,000 lines each are compared without alignment (too slow otherwise).
  */
+// A changed diff row whose two sides differ only in spaces or tabs (feedback #1015).
+export function isSpaceOnlyChange(row) {
+  if (row?.type !== 'changed') return false
+  const squash = (t) => t.replace(/[ \t]+/g, ' ').trim()
+  return squash(row.left) === squash(row.right)
+}
+
 export function sideBySideDiff(oldText, newText) {
   const a = String(oldText ?? '').split(/\r?\n/)
   const b = String(newText ?? '').split(/\r?\n/)

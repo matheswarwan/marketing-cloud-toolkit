@@ -11,12 +11,13 @@ import {
   Search, ArrowLeft, Clock, Copy, Play, RotateCcw, Trash2, AlertCircle, Check, Loader2, Settings as SettingsIcon, ExternalLink,
 } from 'lucide-vue-next'
 import CodeView from '@/components/results/CodeView.vue'
+import DiffView from '@/components/results/DiffView.vue'
 import { useStoredSetting } from '@/composables/useStoredSetting.js'
 import { showToast } from '@/composables/useToast.js'
 import { sfmcFetch, logInfo } from '@/utils/sfmcApi.js'
 import {
   ACTIVITY_SAVER_SETTING, activityKindLabel, isActivityKey, searchRecords, sideBySideDiff, activityUrl, restoreBody,
-  isBadActivityKey,
+  isBadActivityKey, isSpaceOnlyChange,
 } from '@/utils/activityVersions.js'
 
 const route = useRoute()
@@ -67,6 +68,7 @@ const selected = computed(() => versions.value[selectedIdx.value] || null)
 const older = computed(() => versions.value[selectedIdx.value + 1] || null)
 const diffRows = computed(() => (selected.value && older.value ? sideBySideDiff(older.value.content, selected.value.content) : []))
 const changedCount = computed(() => diffRows.value.filter((r) => r.type !== 'same').length)
+const spaceOnlyCount = computed(() => diffRows.value.filter(isSpaceOnlyChange).length)
 const lang = computed(() => (record.value?.kind === 'script' ? 'javascript' : 'sql'))
 
 const label = (v) => `v${versions.value.length - versions.value.indexOf(v)}`
@@ -247,15 +249,8 @@ const automationStudioUrl = (stack) => `https://mc.${stack}.exacttarget.com/clou
             <div class="flex-1 min-h-0 overflow-auto p-4">
               <CodeView v-if="view === 'code'" :key="selected.versionId" :code="selected.content" :lang="lang" max-height="none" />
               <template v-else>
-                <p class="text-[11px] text-muted-foreground mb-2">{{ label(older) }} on the left, {{ label(selected) }} on the right. {{ changedCount }} {{ changedCount === 1 ? 'line differs' : 'lines differ' }}.</p>
-                <div class="rounded-md border border-border overflow-auto font-mono text-[11px] leading-5" aria-label="Changes">
-                  <div v-for="(row, i) in diffRows" :key="i" class="grid grid-cols-2">
-                    <pre class="px-2 whitespace-pre-wrap break-all border-r border-border"
-                      :class="row.type === 'removed' || row.type === 'changed' ? 'bg-red-50 dark:bg-red-950/40' : ''">{{ row.left ?? '' }}</pre>
-                    <pre class="px-2 whitespace-pre-wrap break-all"
-                      :class="row.type === 'added' || row.type === 'changed' ? 'bg-emerald-50 dark:bg-emerald-950/40' : ''">{{ row.right ?? '' }}</pre>
-                  </div>
-                </div>
+                <p class="text-[11px] text-muted-foreground mb-2">{{ label(older) }} on the left, {{ label(selected) }} on the right. {{ changedCount }} {{ changedCount === 1 ? 'line differs' : 'lines differ' }}<template v-if="spaceOnlyCount"> ({{ spaceOnlyCount === changedCount ? 'all' : spaceOnlyCount }} only in spaces or tabs)</template>.</p>
+                <DiffView :key="`${older?.versionId}-${selected.versionId}`" :left="older?.content || ''" :right="selected.content" :lang="lang" />
               </template>
             </div>
           </section>
