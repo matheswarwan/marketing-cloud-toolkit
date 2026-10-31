@@ -50,5 +50,14 @@
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.4",
     "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "js-beautify": {
+      "glob": "^14.0.2",
+      "minimatch": "^11.0.1"
+    },
+    "editorconfig": {
+      "minimatch": "^11.0.1"
+    }
   }
 }
