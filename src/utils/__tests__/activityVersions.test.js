@@ -121,6 +121,7 @@ describe('captureActivity (service worker)', () => {
   let store
   let fetched
   let current
+  let fetchImpl
   beforeEach(() => {
     vi.resetModules()
     store = { _activitySaverEnabled: true } // off unless turned on
@@ -130,7 +131,10 @@ describe('captureActivity (service worker)', () => {
       storageGet: async (area, keys) => Object.fromEntries([].concat(keys).filter((k) => k in store).map((k) => [k, store[k]])),
       storageSet: async (area, o) => { Object.assign(store, o) },
     }))
-    vi.doMock('../../background/fetchProxy.js', () => ({ sfmcFetch: async ({ url }) => { fetched.push(url); return current } }))
+    fetchImpl = async ({ url }) => { fetched.push(url); return current }
+    // One mock with a swappable body: a second vi.doMock of the same path in a test
+    // was sometimes ignored, which made the hang test flaky.
+    vi.doMock('../../background/fetchProxy.js', () => ({ sfmcFetch: (args) => fetchImpl(args) }))
     vi.doMock('../../background/businessUnit.js', () => ({ fetchCurrentBusinessUnit: async () => ({ name: 'Main BU', accountId: 7 }) }))
   })
   afterEach(() => {
@@ -156,7 +160,7 @@ describe('captureActivity (service worker)', () => {
   })
 
   it('stores the saved version when the read before it hangs', async () => {
-    vi.doMock('../../background/fetchProxy.js', () => ({ sfmcFetch: () => new Promise(() => {}) }))
+    fetchImpl = () => new Promise(() => {})
     const { captureActivity, captureTiming } = await import('../../background/activityCapture.js')
     captureTiming.beforeReadMs = 30
     await save(captureActivity, { name: 'Daily', queryText: 'SELECT new' })
