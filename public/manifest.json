@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Marketing Cloud Toolkit",
-  "version": "2.0.22",
+  "version": "2.0.23",
   "description": "Run and save SFMC SQL, and explore automations, journeys, data extensions, CloudPages and saved email versions in one place.",
   "action": {
     "default_title": "Open Marketing Cloud Toolkit",

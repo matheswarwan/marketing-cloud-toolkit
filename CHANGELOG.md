@@ -2,6 +2,32 @@
 
 All notable changes to Marketing Cloud Toolkit. Versions 2.0.0 and later are published to the Chrome Web Store as updates to the former SFMC Query Saver listing (1.x). Entries before 2.0.18 are the GitHub release notes, unchanged; "Checked headless" notes describe testing at the time.
 
+## 2.0.23 (2026-11-12)
+
+No permission changes since 2.0.22. **First feature that changes SFMC data:** Remove contacts from a journey (below). Administrators can turn it off with the new policy `disableJourneyWrites`; the privacy policy says so.
+
+**New:**
+- Journeys > Remove contacts from a journey: Contact Keys from a pasted list, a file or a data extension column, sent to Journey Builder 50 at a time after you review them and type the number to confirm; each contact's exit status is read back.
+- Contacts: Subscriber lookup (one subscriber's status, lists and attributes), Contact deletions (deletion requests and their status), Suppression lists, SMS subscriptions, and a Data model page (attribute groups and their data extensions).
+- Sending: Transactional sends, Triggered sends, Sends (recent sends with their counts), Event notifications (ENS subscriptions with a sample callback page) and Send settings (send classifications, sender profiles and what uses them). Setup: Users and roles, Business units with a MID lookup, and File locations.
+- Recycle bin for deleted data extensions and Content Builder items, and a Content Builder clean-up report (unused, old and duplicate items).
+- Automation: Import results page, and recent runs on import activity cards.
+- Content > Changes: what was created or modified in a period, and by whom (feedback #1087).
+- Journey pages show what Journey Builder shows: status, activity count, duration, entry data extension, re-entry setting and contact counts per step, plus the journey's audit log. A journey's page can check whether a contact is in it and draw contact paths on the canvas (feedback #1088, #1089, #1094, #1095); Contact journeys moved under Journeys.
+- Automations show Automation Studio's own icons (read from your SFMC stack, not shipped with the extension) and the details Automation Studio shows: created, saved and paused by, folder, and the schedule start in the schedule's time zone.
+- Email validation can write to a copy of the data extension, summarizes results by category, and runs in the background with a notice when it ends; Activity history lists background jobs (feedback #1090 to #1092).
+- Preview data opens as its own page (also in a new tab), with Load 50k rows and Load last N rows (feedback #1097).
+
+**Changed:**
+- What's New shows 3 items a page with Previous and Next (feedback #1083).
+- AI answers are formatted (lists, bold, code) instead of raw Markdown (feedback #1096).
+- Saved Emails keep each save's content once, so more emails fit, and say when Chrome refuses a save (feedback #1086).
+- Where used links data extensions to their pages (feedback #1098).
+
+**Fixed:**
+- ORDER BY without TOP runs: OFFSET 0 ROWS is added when you run, validate or save (feedback #1093); the SQL check for it is now a warning.
+- Content Builder and Journey Builder sessions start through their SSO page and wait longer on slow stacks, with a hint on what to open (feedback #1099); stack 1 uses the right hosts.
+
 ## 2.0.22 (2026-11-09)
 
 No permission changes since 2.0.21.

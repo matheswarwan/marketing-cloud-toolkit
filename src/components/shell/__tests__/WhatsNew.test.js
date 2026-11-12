@@ -11,15 +11,15 @@ describe("What's New (feedback #1083)", () => {
     expect(w.find('[data-whatsnew]').classes()).toContain('max-h-[calc(100vh-2rem)]')
     expect(w.find('#whatsnew-title').text()).toBe("What's new in Marketing Cloud Toolkit")
     expect(w.findAll('[data-whatsnew-item]')).toHaveLength(3)
-    expect(w.text()).toContain('Ask an AI')
-    expect(w.text()).not.toContain('One more SQL check')
+    expect(w.text()).toContain('Remove contacts from a journey')
+    expect(w.text()).not.toContain('Background jobs')
     expect(w.find('[data-whatsnew-page]').text()).toMatch(/^Page 1 of \d+$/)
     expect(w.find('[data-whatsnew-prev]').attributes('disabled')).toBeDefined()
 
     await w.find('[data-whatsnew-next]').trigger('click')
     expect(w.find('[data-whatsnew-page]').text()).toMatch(/^Page 2 of/)
-    expect(w.text()).toContain('One more SQL check')
-    expect(w.text()).not.toContain('Ask an AI')
+    expect(w.text()).toContain('Background jobs')
+    expect(w.text()).not.toContain('Remove contacts from a journey')
     // This version's 5 items fill pages 1 and 2; page 2 ends with the first earlier update.
     expect(w.findAll('[data-whatsnew-item]').at(2).text()).toMatch(/^Earlier update/)
 
