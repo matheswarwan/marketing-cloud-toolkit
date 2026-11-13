@@ -26,6 +26,7 @@ No permission changes since 2.0.22. **First feature that changes SFMC data:** Re
 
 **Fixed:**
 - ORDER BY without TOP runs: OFFSET 0 ROWS is added when you run, validate or save (feedback #1093); the SQL check for it is now a warning.
+- Data > Where used: on windows 1024px or wider, the search results and field lists scroll to the last row (they were cut off). Contributed by João Avila (PR #11).
 - Content Builder and Journey Builder sessions start through their SSO page and wait longer on slow stacks, with a hint on what to open (feedback #1099); stack 1 uses the right hosts.
 
 ## 2.0.22 (2026-11-09)
