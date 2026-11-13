@@ -201,7 +201,7 @@ const countText = computed(() => {
             <span class="font-semibold">{{ fieldDE.name }}</span>
           </div>
           <div v-if="fieldsLoading" class="flex items-center gap-2 text-[13px] text-muted-foreground"><Loader2 class="h-4 w-4 animate-spin" /> Loading fields…</div>
-          <section v-else class="rounded-[14px] border border-border bg-card overflow-hidden">
+          <section v-else class="shrink-0 rounded-[14px] border border-border bg-card overflow-hidden">
             <div v-for="(f, i) in fieldList" :key="f.name" class="flex items-center gap-3 px-3.5 py-2.5" :class="{ 'border-t border-border': i,
               'bg-primary/5 shadow-[inset_3px_0_0_hsl(var(--primary))]': usage.state.target?.kind === 'field' && usage.state.target.field === f.name && usage.state.target.de?.name === fieldDE.name }">
               <div class="flex-1 min-w-0 flex flex-col gap-0.5">
@@ -218,7 +218,7 @@ const countText = computed(() => {
         <!-- Search results -->
         <template v-else-if="rows">
           <p v-if="!rows.length" class="text-sm text-muted-foreground">Nothing found.</p>
-          <section v-else class="rounded-[14px] border border-border bg-card overflow-hidden">
+          <section v-else class="shrink-0 rounded-[14px] border border-border bg-card overflow-hidden">
             <div v-for="(r, i) in rows" :key="r.key" class="flex items-center gap-3 px-3.5 py-2.5"
               :class="[i ? 'border-t border-border' : '', isCurrent(r) ? 'bg-primary/5 shadow-[inset_3px_0_0_hsl(var(--primary))]' : '']">
               <div class="flex-1 min-w-0 flex flex-col gap-[3px]">
