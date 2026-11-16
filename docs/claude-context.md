@@ -58,7 +58,7 @@ Page helpers: `utils/sfmcApi.js` `sfmcFetch(url, method, body)` (via `SFMC_FETCH
 - Core (`mc.<s>.exacttarget.com`): cookies + CSRF sniffed from SFMC's own requests (`csrf.js`, 14 min, session storage).
 - `*.marketingcloudapps.com` apps: Bearer token minted by opening `AutomationStudioFuel3/update-token.json` in an inactive tab, read by `content.js` (`mcaToken.js`). Content Builder writes add the `_csrf` cookie as a header; Journey Builder CSRF from `jbCsrf.js`; Contacts headers from `pageHeaders.js`.
 - Missing session: `sessions.js` opens the app's landing in an inactive tab until its probe returns 200, then retries once (`fetchProxy.js`).
-- No SOAP anywhere: only internal app REST APIs (`/fuelapi/...`). Base URLs: `sfmcApi.js` (core), `automationApi.js`, `deApi.js`/`contactsApi.js` (contactsmeta), `journeyApi.js` (jbinteractions), `cloudPagesApi.js` (content-builder, cloud-pages), `storageApi.js` (mc-data-ui).
+- Mostly internal app REST APIs (`/fuelapi/...`). SOAP only for read-only Retrieve of an allowlist (`SOAP_OBJECTS` in `background/soap.js`: users, roles, BUs, sends, triggered sends, subscribers, lists, bounce/unsub/sent events, profiles, import results, suppression lists) with the MCA token as `<fueloauth>`; a new object type must be added there. Base URLs: `sfmcApi.js` (core), `automationApi.js`, `deApi.js`/`contactsApi.js` (contactsmeta), `journeyApi.js` (jbinteractions), `cloudPagesApi.js` (content-builder, cloud-pages), `storageApi.js` (mc-data-ui).
 - New API call: put it in the matching `*Api.js`, use its base-URL helper with `stack`, accept `fetch = sfmcFetch` for tests, wrap UI calls in `withReconnect` + `searchError` (`utils/sfmcErrors.js`) and show `SfmcErrorNotice`.
 
 ## Automation Studio links
