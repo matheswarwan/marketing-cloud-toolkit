@@ -9,8 +9,38 @@
 export const TO_TEST = [
   {
     version: '2.0.24',
-    status: 'In progress (branch where-used-map)',
+    status: 'In progress (branches where-used-map, velens-ideas)',
     items: [
+      {
+        id: '2.0.24-send-problems', area: 'Sending', title: 'Send problems and engagement events', ref: 'user, 2026-11-16', from: 'Mathes', live: false,
+        where: 'Sending > Send problems; Sending > Engagement events',
+        steps: ['Open Send problems; switch 24 hours, 7 and 30 days.', 'Compare bounce counts with Email Studio tracking; open a JobID chip.', 'Open Engagement events; check each tab; open a JobID.', 'Download both pages.'],
+        expect: 'Cards load on their own; counts match SFMC; a period with more than 10,000 events says only the newest were read. Checked live on s10 Mathes Sandbox, 2026-11-16 (no events in that account, so empty states only).',
+      },
+      {
+        id: '2.0.24-send-details', area: 'Sending', title: 'Send details and journey email results', ref: 'user, 2026-11-16', from: 'Mathes', live: false,
+        where: 'Sending > Sends (Details); a journey > Email results',
+        steps: ['Search a JobID; check the lists, not-sent and unsubscribes parts.', 'Open a journey with email steps; open Email results.'],
+        expect: 'Lists with their numbers; reasons for not sent; journey email numbers match Journey Builder\'s email stats. Checked live on s10: JobID 441901 (All Subscribers, 1 sent) and TK_Paths_Test_Journey (5 sent).',
+      },
+      {
+        id: '2.0.24-email-checks', area: 'Content', title: 'Email checks and preview modes', ref: 'user, 2026-11-16', from: 'Mathes', live: false,
+        where: 'Content > Emails, pick an email: Checks; Preview > Dark, Images off, Mobile',
+        steps: ['Pick an email without an unsubscribe link or address, and one with them.', 'Look at each preview mode; try Preview with data then Checks.'],
+        expect: 'Missing unsubscribe link or address fails; the rest warn or pass with a reason; previews keep the email readable. Checked live on s10 with TK_Paths_Test_Email.',
+      },
+      {
+        id: '2.0.24-subscriber-bus', area: 'Contacts', title: 'Subscriber in every business unit', ref: 'user, 2026-11-16', from: 'Mathes', live: false,
+        where: 'Contacts > Subscriber lookup, then Check every business unit',
+        steps: ['Look up a key in a child business unit, then Check every business unit.', 'Try an email address.'],
+        expect: 'One row per business unit with its name and status. Checked live on s10: key 2 in all 33 business units.',
+      },
+      {
+        id: '2.0.24-starter-palette', area: 'Queries', title: 'Starter queries and more Ctrl+K searches', ref: 'user, 2026-11-16', from: 'Mathes', live: false,
+        where: 'Queries > Starter queries; Ctrl+K',
+        steps: ['Open a starter query in Run Query and run it.', 'Ctrl+K: type a name, then a JobID.'],
+        expect: 'Each starter query runs without changes (dates relative to today); Ctrl+K offers emails, content blocks, Where used, subscribers, starter queries and, for a number, Sends by JobID.',
+      },
       {
         id: '2.0.24-where-used-map', area: 'Data', title: 'Where used map', ref: 'user, 2026-11-16', from: 'Mathes', live: false,
         where: 'Data > Where used, any check, Map above the results',

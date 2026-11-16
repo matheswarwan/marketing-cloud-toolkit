@@ -124,6 +124,16 @@ Worker: `background/policy.js`; pages: `utils/policy.js` (`policy`, `isPolicyOn`
 - vue-flow: nodes that are neither selectable nor draggable get `pointer-events: none` unless `<VueFlow>` has node listeners, so the map forces it in CSS; it drops view changes made before its pane is ready, so the view is set on nodes initialised, pane ready and once more.
 - Design idea from VeLens for Marketing Cloud (no licence): no code taken.
 
+## Ideas from VeLens (2.0.24, user 2026-11-16, branch `velens-ideas`)
+
+- Email checks (`utils/emailChecks.js`) and preview modes Dark, Images off, Mobile (`utils/emailPreviewModes.js`) on Content > Emails. Preview styles are injected after `<head>`/`<body>`/`<html>`/doctype, never before the doctype (quirks mode).
+- Send problems (`/send-problems`), Engagement events (`/engagement-events`), Send details on Sends (`components/sending/SendDetails.vue`): `utils/sendEvents.js` over SOAP BounceEvent, NotSentEvent, ListSend, UnsubEvent, ForwardedEmailEvent, ForwardedEmailOptInEvent, SMSMOEvent (only EventDate, MOCode, Carrier answer). Feeds read at most 4 pages (10,000 events) and say when capped (`rows.capped` from `soapRetrieveAll` `pageLimit`).
+- Journey Email results (`components/journey/JourneyEmailResults.vue`): email activity `configurationArguments.triggeredSendKey` → TriggeredSendSummary.
+- Subscriber in every business unit: SOAP Subscriber with QueryAllAccounts gives one row per BU with Client.ID (ClientIDs with every MID answered for the current BU only).
+- Starter queries (`data/starterQueries.js`, `/queries/starter`): tests lint every query and check every data view field.
+- Ctrl+K search actions can carry extra query (`kind`) and a `when(text)` test; `useRouteSearch` passes the whole query to its handler.
+- SOAP builder: one-value `IN` is sent as `equals` (SFMC refuses IN with one value); `clientIds` adds `<ClientIDs>`.
+
 ## UI conventions
 
 - Never use browser `alert`/`confirm`: `await askConfirm({...})` (feedback #1050).

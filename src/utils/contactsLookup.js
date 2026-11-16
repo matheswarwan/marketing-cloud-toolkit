@@ -40,6 +40,29 @@ export async function fetchSubscribers(stack, { key = null, email = null, retrie
   return rows.map(subscriberRow)
 }
 
+/**
+ * The subscriber in every business unit this login can see (user, 2026-11-16; idea from
+ * VeLens): SOAP Subscriber with QueryAllAccounts gives one row per business unit, each
+ * with its own Client.ID and status (live test, s10: subscriber 2 came back for all 33
+ * business units; ClientIDs with every MID answered for the current one only). By key or
+ * email address. `buNames`: Map MID -> name. Profile attributes are dropped as above.
+ */
+export async function fetchSubscriberAcrossBUs(stack, { key = null, email = null, buNames = new Map(), retrieve } = {}) {
+  const filter = key != null ? byKey(key) : { property: 'EmailAddress', operator: 'equals', values: [String(email)] }
+  const rows = await soapRetrieveAll(stack, 'Subscriber', [...SUBSCRIBER_PROPS, 'Client.ID'], { filter, queryAllAccounts: true, ...opts(retrieve) })
+  return rows.map((s) => {
+    const mid = num(s.Client?.ID)
+    return { ...subscriberRow(s), mid, businessUnit: buNames.get(mid) || (mid ? `MID ${mid}` : '') }
+  }).sort((a, b) => a.businessUnit.localeCompare(b.businessUnit) || a.key.localeCompare(b.key))
+}
+
+/** Statuses across business units in one line: "Active in 30, Unsubscribed in 3". */
+export function statusSummary(rows) {
+  const m = new Map()
+  for (const r of rows) m.set(r.status || 'Unknown', (m.get(r.status || 'Unknown') || 0) + 1)
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([st, n]) => `${st} in ${n}`).join(', ')
+}
+
 // ── Lists ─────────────────────────────────────────────────
 const LIST_SUB_PROPS = ['ListID', 'SubscriberKey', 'Status', 'CreatedDate', 'UnsubscribedDate']
 const LIST_PROPS = ['ID', 'ListName', 'Type', 'ListClassification']

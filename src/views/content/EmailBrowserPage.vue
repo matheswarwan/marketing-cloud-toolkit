@@ -4,8 +4,13 @@
 // Preview, Text and Code, and Preview with data: pick a data extension and a row, then
 // SFMC renders the email for that row (guide/v1 preview), or the Toolkit fills in the
 // %%Field%% strings itself. Read only: nothing in SFMC changes.
+// User, 2026-11-16 (ideas from VeLens): Checks (unsubscribe link, postal address, preheader,
+// text version, images, links, width, size; utils/emailChecks.js) and preview modes
+// Dark, Images off and Mobile (utils/emailPreviewModes.js).
 import { computed, reactive, ref, watch } from 'vue'
-import { Search, Loader2, Mail, RefreshCw, Database } from 'lucide-vue-next'
+import { Search, Loader2, Mail, RefreshCw, Database, CircleCheck, CircleAlert, CircleX, Info as InfoIcon } from 'lucide-vue-next'
+import { checkEmail } from '@/utils/emailChecks.js'
+import { PREVIEW_MODES, MOBILE_FRAME_WIDTH, previewHtml } from '@/utils/emailPreviewModes.js'
 import Button from '@/components/ui/button/Button.vue'
 import Input from '@/components/ui/input/Input.vue'
 import SfmcErrorNotice from '@/components/results/SfmcErrorNotice.vue'
@@ -104,7 +109,10 @@ const asset = ref(null)
 const parts = ref(null)
 const assetLoading = ref(false)
 const assetError = ref('')
-const view = ref('preview') // preview | text | code
+const view = ref('preview') // preview | text | code | checks
+const MODE_KEY = 'toolkit_email_preview_mode'
+const previewMode = ref((() => { try { const m = localStorage.getItem(MODE_KEY); return PREVIEW_MODES.some((x) => x.id === m) ? m : 'normal' } catch { return 'normal' } })())
+watch(previewMode, (m) => { try { localStorage.setItem(MODE_KEY, m) } catch { /* no storage */ } })
 
 async function pick(row) {
   picked.value = row
@@ -250,6 +258,12 @@ watch(dataMode, (m) => {
 function clearData() { dataPreview.value = null; dataOpen.value = false }
 
 const shownHtml = computed(() => dataPreview.value?.html ?? parts.value?.html ?? '')
+const frameHtml = computed(() => previewHtml(shownHtml.value, previewMode.value))
+const modeNote = computed(() => PREVIEW_MODES.find((m) => m.id === previewMode.value)?.note || '')
+// Checks run on what is shown: with data, the filled-in email.
+const checks = computed(() => (parts.value ? checkEmail({ html: shownHtml.value, text: parts.value.text, subject: shownSubject.value, preheader: shownPreheader.value }, { textGenerated: !!asset.value?.views?.text?.generateFrom }) : null))
+const CHECK_ICON = { fail: CircleX, warn: CircleAlert, info: InfoIcon, pass: CircleCheck }
+const CHECK_TONE = { fail: 'text-red-600 dark:text-red-400', warn: 'text-amber-600 dark:text-amber-400', info: 'text-sky-600 dark:text-sky-400', pass: 'text-emerald-600 dark:text-emerald-400' }
 const shownSubject = computed(() => dataPreview.value?.subject ?? parts.value?.subject ?? '')
 const shownPreheader = computed(() => dataPreview.value?.preheader ?? parts.value?.preheader ?? '')
 
@@ -323,6 +337,9 @@ useRouteSearch('/emails', (q) => { text.value = q; searchAll.value = true; whenS
             <div class="flex flex-wrap items-center gap-1.5 pt-1">
               <button v-for="v in [['preview', 'Preview'], ['text', 'Text'], ['code', 'Code']]" :key="v[0]" type="button"
                 class="h-7 px-3 rounded-full border text-xs" :class="view === v[0] ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-accent'" @click="view = v[0]">{{ v[1] }}</button>
+              <button type="button" class="h-7 px-3 rounded-full border text-xs inline-flex items-center gap-1" :class="view === 'checks' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-accent'" data-email-checks-tab @click="view = 'checks'">
+                Checks<span v-if="checks && (checks.counts.fail || checks.counts.warn)" class="rounded-full px-1.5 text-[10px] font-semibold" :class="checks.counts.fail ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'">{{ checks.counts.fail + checks.counts.warn }}</span>
+              </button>
               <button type="button" class="h-7 px-3 rounded-full border text-xs inline-flex items-center gap-1" :class="dataOpen ? 'bg-primary/10 border-primary text-primary' : 'border-border hover:bg-accent'" data-preview-data-toggle @click="dataOpen = !dataOpen">
                 <Database class="h-3.5 w-3.5" /> Preview with data
               </button>
@@ -410,8 +427,27 @@ useRouteSearch('/emails', (q) => { text.value = q; searchAll.value = true; whenS
           <div v-else-if="assetError" class="p-4 text-red-700 dark:text-red-300 flex items-center gap-2">{{ assetError }} <ReportErrorButton :error="assetError" /></div>
           <template v-else-if="parts">
             <div v-if="view === 'preview'" class="flex-1 min-h-[480px] p-3 flex flex-col gap-1">
-              <iframe :srcdoc="shownHtml" sandbox="" class="flex-1 w-full rounded-lg border border-border bg-white" title="Email preview" data-email-frame />
+              <div class="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Preview as">
+                <button v-for="m in PREVIEW_MODES" :key="m.id" type="button" class="h-7 px-2.5 rounded-full border" :aria-pressed="previewMode === m.id" :data-preview-mode="m.id"
+                  :class="previewMode === m.id ? 'bg-primary/10 border-primary text-primary' : 'border-border hover:bg-accent'" @click="previewMode = m.id">{{ m.label }}</button>
+                <span v-if="modeNote" class="text-[11px] text-muted-foreground">{{ modeNote }}</span>
+              </div>
+              <div class="flex-1 flex justify-center" :class="previewMode === 'mobile' ? 'bg-muted/40 rounded-lg py-3' : ''">
+                <iframe :srcdoc="frameHtml" sandbox="" class="h-full min-h-[440px] rounded-lg border border-border bg-white" :style="previewMode === 'mobile' ? { width: `${MOBILE_FRAME_WIDTH}px` } : { width: '100%' }" title="Email preview" data-email-frame />
+              </div>
               <p class="text-[11px] text-muted-foreground">Scripts do not run in the preview. Without data, AMPscript shows as written.</p>
+            </div>
+            <div v-else-if="view === 'checks' && checks" class="flex-1 p-3 space-y-2" data-email-checks>
+              <p class="text-xs text-muted-foreground">
+                <strong class="text-foreground">{{ checks.counts.fail }} to fix, {{ checks.counts.warn }} to look at, {{ checks.counts.pass }} fine.</strong>
+                Checked here from the email's code{{ dataPreview ? ' as filled in with the data above' : '' }}; nothing is sent anywhere. Mail apps differ, so a test send is still the final word.
+              </p>
+              <ul class="rounded-lg border border-border bg-card divide-y divide-border">
+                <li v-for="c in checks.checks" :key="c.id" class="flex items-start gap-2.5 px-3 py-2" :data-check="c.id" :data-level="c.level">
+                  <component :is="CHECK_ICON[c.level]" class="h-4 w-4 mt-0.5 shrink-0" :class="CHECK_TONE[c.level]" :aria-label="c.level" />
+                  <div class="min-w-0"><div class="text-sm font-medium">{{ c.title }}</div><div class="text-xs text-muted-foreground">{{ c.detail }}</div></div>
+                </li>
+              </ul>
             </div>
             <pre v-else-if="view === 'text'" class="flex-1 m-3 p-3 rounded-lg border border-border whitespace-pre-wrap text-xs">{{ parts.text || 'No text version.' }}</pre>
             <div v-else class="flex-1 min-h-[480px] p-3"><CodeView :code="shownHtml" lang="html" /></div>

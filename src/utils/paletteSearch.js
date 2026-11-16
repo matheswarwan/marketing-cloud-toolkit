@@ -1,6 +1,7 @@
 // What Ctrl+K lists for a search text: sections, saved queries and emails that match,
 // and "search this in <section>" actions for the SFMC sections.
 
+// `when(text)`: only offered when it says so (a JobID is a number); `query`: extras for the page.
 export const SEARCH_ACTIONS = [
   { path: '/data-extensions', label: 'Data Extensions' },
   { path: '/automations', label: 'Automations' },
@@ -8,6 +9,13 @@ export const SEARCH_ACTIONS = [
   { path: '/journeys', label: 'Journeys' },
   { path: '/journey-entry', label: 'Journey entry events' },
   { path: '/cloudpages', label: 'CloudPages' },
+  // User, 2026-11-16 (idea from VeLens's palette): emails, content blocks, subscribers, sends.
+  { path: '/emails', label: 'Emails' },
+  { path: '/where-used', label: 'Content blocks (Where used)', query: { kind: 'block' } },
+  { path: '/where-used', label: 'Where a data extension is used', query: { kind: 'de' } },
+  { path: '/subscribers', label: 'Subscribers' },
+  { path: '/sends', label: 'Sends by JobID', when: (t) => /^\d+$/.test(t) },
+  { path: '/queries/starter', label: 'Starter queries' },
 ]
 
 const MAX_RECORDS = 8
@@ -50,8 +58,8 @@ export function paletteEntries(text, sections, storage = {}) {
     .filter((v) => matches(v.name, v.key, v.activityId, v.versions[0]?.content))
     .slice(0, MAX_RECORDS)
     .map((v) => ({ kind: 'activity', label: v.name || v.activityId, hint: v.kind === 'script' ? 'Saved Script' : 'Saved SQL Query', to: { path: `/saved-activities/${v.id}` } }))
-  const actions = SEARCH_ACTIONS.map((a) => ({
-    kind: 'search', label: `Search ${a.label} for "${text.trim()}"`, hint: 'SFMC', to: { path: a.path, query: { q: text.trim() } },
+  const actions = SEARCH_ACTIONS.filter((a) => !a.when || a.when(text.trim())).map((a) => ({
+    kind: 'search', label: `Search ${a.label} for "${text.trim()}"`, hint: 'SFMC', to: { path: a.path, query: { ...(a.query || {}), q: text.trim() } },
   }))
   return [...out, ...queries, ...emails, ...activities, ...actions]
 }

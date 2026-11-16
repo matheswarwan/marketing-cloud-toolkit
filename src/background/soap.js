@@ -15,11 +15,15 @@ export const SOAP_OBJECTS = new Set([
   'SendClassification', 'SenderProfile', 'ImportResultsSummary', 'ImportDefinition',
   // API idea 16 (user, 2026-11-11): suppression lists and where they apply (not checked live).
   'SuppressionListDefinition', 'SuppressionListContext',
+  // User, 2026-11-16 (ideas from VeLens): send problems, lists a send went to, and the
+  // engagement feed (forwards, forward opt-ins, inbound SMS).
+  'NotSentEvent', 'ListSend', 'ForwardedEmailEvent', 'ForwardedEmailOptInEvent', 'SMSMOEvent',
 ])
 const OPERATORS = new Set(['equals', 'notEquals', 'greaterThan', 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual', 'IN', 'like', 'isNull', 'isNotNull', 'between'])
 const STACK = /^s\d{1,3}$/i
 const NAME = /^[A-Za-z][A-Za-z0-9_.]{0,80}$/
 const REQUEST_ID = /^[0-9a-f-]{36}$/i
+const CLIENT_ID = /^\d{1,12}$/
 
 export const soapUrl = (stack) => `https://webservice.${stack}.exacttarget.com/Service.asmx`
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -32,18 +36,29 @@ function filterXml(f, tag = 'Filter') {
   }
   if (!NAME.test(f.property || '') || !OPERATORS.has(f.operator)) throw new Error('Bad filter')
   const values = (Array.isArray(f.values) ? f.values : f.values == null ? [] : [f.values]).slice(0, 2500)
+  // SFMC refuses IN with one value ("IN Operator needs more than one values", live test
+  // on s10, 2026-11-16): that is an equals.
+  const operator = f.operator === 'IN' && values.length === 1 ? 'equals' : f.operator
   const dates = f.dates ? values.map((v) => `<DateValue>${esc(v)}</DateValue>`).join('') : values.map((v) => `<Value>${esc(v)}</Value>`).join('')
-  return `<${tag} xsi:type="SimpleFilterPart"><Property>${esc(f.property)}</Property><SimpleOperator>${f.operator}</SimpleOperator>${dates}</${tag}>`
+  return `<${tag} xsi:type="SimpleFilterPart"><Property>${esc(f.property)}</Property><SimpleOperator>${operator}</SimpleOperator>${dates}</${tag}>`
+}
+
+function clientIdsXml(ids) {
+  if (ids == null) return ''
+  const list = (Array.isArray(ids) ? ids : [ids]).map(String)
+  if (!list.length || list.length > 50 || !list.every((id) => CLIENT_ID.test(id))) throw new Error('Bad business unit ID')
+  return `<ClientIDs>${list.map((id) => `<ID>${id}</ID>`).join('')}</ClientIDs>`
 }
 
 /** The Retrieve envelope (exported for tests). `token` is filled in by soapRetrieve. */
-export function retrieveEnvelope({ stack, objectType, properties = [], filter = null, queryAllAccounts = false, continueRequest = null }, token) {
+// `clientIds`: business unit MIDs to read in (a parent BU's session reading a child), up to 50.
+export function retrieveEnvelope({ stack, objectType, properties = [], filter = null, queryAllAccounts = false, clientIds = null, continueRequest = null }, token) {
   if (!STACK.test(String(stack || ''))) throw new Error('Unknown stack')
   if (!SOAP_OBJECTS.has(objectType)) throw new Error(`Reading ${objectType} is not supported`)
   const props = properties.filter((p) => NAME.test(p)).slice(0, 100)
   const body = continueRequest
     ? `<RetrieveRequest><ContinueRequest>${REQUEST_ID.test(continueRequest) ? continueRequest : ''}</ContinueRequest></RetrieveRequest>`
-    : `<RetrieveRequest>${queryAllAccounts ? '<QueryAllAccounts>true</QueryAllAccounts>' : ''}<ObjectType>${objectType}</ObjectType>${props.map((p) => `<Properties>${p}</Properties>`).join('')}${filterXml(filter)}</RetrieveRequest>`
+    : `<RetrieveRequest>${clientIdsXml(clientIds)}${queryAllAccounts ? '<QueryAllAccounts>true</QueryAllAccounts>' : ''}<ObjectType>${objectType}</ObjectType>${props.map((p) => `<Properties>${p}</Properties>`).join('')}${filterXml(filter)}</RetrieveRequest>`
   return `<?xml version="1.0" encoding="UTF-8"?><s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://schemas.xmlsoap.org/ws/2004/08/addressing" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><s:Header><a:Action s:mustUnderstand="1">Retrieve</a:Action><a:To s:mustUnderstand="1">${soapUrl(stack)}</a:To><fueloauth xmlns="http://exacttarget.com">${esc(token || '')}</fueloauth></s:Header><s:Body><RetrieveRequestMsg xmlns="http://exacttarget.com/wsdl/partnerAPI">${body}</RetrieveRequestMsg></s:Body></s:Envelope>`
 }
 

@@ -2,12 +2,13 @@
 // Where used: pick any kind of thing (data extension, data view, field, activity,
 // automation, entry event, email, content block, file location, profiles) and see
 // where it is used. The scan runs in the Where used panel (components/usage/).
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { Search, Loader2, Network, Database, ChevronRight } from 'lucide-vue-next'
 import UsagePanel from '@/components/usage/UsagePanel.vue'
 import SfmcErrorNotice from '@/components/results/SfmcErrorNotice.vue'
 import { withReconnect, searchError } from '@/utils/sfmcErrors.js'
-import { useStack } from '@/composables/useStack.js'
+import { useStack, whenStack } from '@/composables/useStack.js'
+import { useRouteSearch } from '@/composables/useRouteSearch.js'
 import { useUsage, targetKey } from '@/composables/useUsage.js'
 import { searchLocalDEs, searchSharedSyncDEs, fetchDEFieldList, fieldTypeLabel } from '@/utils/deApi.js'
 import { ACTIVITY_SEARCH_TYPES, searchActivities, searchAutomations } from '@/utils/automationApi.js'
@@ -48,6 +49,14 @@ let all = null // lists loaded whole (entry events, file locations), filtered he
 let runId = 0
 
 watch([kind, activityType], () => { rows.value = null; error.value = ''; fieldDE.value = null; all = null; query.value = '' })
+
+// From Ctrl+K (user, 2026-11-16): ?q=<name>&kind=de|block searches that kind.
+useRouteSearch('/where-used', async (q, extra) => {
+  if (KINDS.some((k) => k.id === extra.kind)) kind.value = extra.kind
+  await nextTick() // the kind watcher clears the box first
+  query.value = q
+  whenStack(search)
+})
 
 const contains = (v, q) => String(v || '').toLowerCase().includes(q.trim().toLowerCase())
 

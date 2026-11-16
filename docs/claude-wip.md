@@ -1,5 +1,12 @@
 # Work in progress
 
+## Ideas from VeLens (2026-11-16, branch `velens-ideas`, on top of `where-used-map`)
+
+All 8 agreed features built, unit-tested and checked live on s10 Mathes Sandbox: email checks, send problems, send details, journey email results, starter queries, dark/images-off/mobile previews, subscriber in every BU, engagement events plus more Ctrl+K searches.
+- Skipped on purpose: VeLens's AI features (send data to their server) and in-SFMC side panels.
+- Live testing notes: Puppeteer element-handle calls and screenshots hang or fail on app pages with the sandboxed srcdoc preview iframe; use raw CDP (`scripts/raw.mjs`, `frames.mjs` in the session scratchpad) and close stale tabs via `/json/close`. Out-of-process preview frames cannot be screenshotted; render the transformed HTML in headless Chrome instead.
+- One transient "No Marketing Cloud session for SOAP" on the first SOAP call after a while; the retry worked (existing token flow).
+
 ## Where used map (2026-11-16, branch `where-used-map`, not committed)
 
 Goal (user): show Where used as a flow chart, like the VeLens extension's dependency map (`~/Downloads/VeLens for Marketing Cloud`, no licence, so ideas only, our own code).
