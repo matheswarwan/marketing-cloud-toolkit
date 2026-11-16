@@ -7,7 +7,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { X, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
-const VERSION = '2.0.23'
+const VERSION = '2.0.24'
 const PAGE_SIZE = 3
 const open = ref(false)
 const fromQuerySaver = ref(false)
@@ -15,11 +15,16 @@ const page = ref(0)
 
 // This version's news first, then earlier updates, PAGE_SIZE to a page (feedback #1083).
 const NEWS = [
-  { title: "Remove contacts from a journey", text: "Journeys > Remove contacts: paste Contact Keys, load a file or pick a data extension column, review, confirm, and see each contact's exit status. The first Toolkit feature that changes SFMC data; your administrator can turn it off." },
-  { title: "More of SFMC in one place", text: "Subscriber lookup, Contact deletions, Suppression lists, SMS subscriptions, Data model, Sends, Triggered and Transactional sends, Event notifications, Send settings, Users and roles, Business units, File locations and Import results, all read only." },
-  { title: "Recycle bin and clean-up", text: "Find deleted data extensions and Content Builder items, and a report of unused, old and duplicate content. Content > Changes shows what was created or modified, and by whom." },
-  { title: "Journeys and automations as SFMC shows them", text: "Journey pages with status, entry source, re-entry, contacts per step, the audit log, a contact check and contact paths. Automations with Automation Studio's own icons and details." },
-  { title: "Background jobs", text: "Email validation runs in the background, can write to a copy of the data extension, and tells you when it is done. Activity history lists what ran." },
+  { title: "Where used as a map", text: "Every Where used check can show its results as a flow chart: where the data comes from and goes, the automations that run each step above it, and possible matches dashed. Hover, click, double-click to follow; download it as a picture." },
+  { title: "Send problems and engagement", text: "Sending > Send problems groups bounces by reason and by send, with messages not sent, triggered sends and imports that need a look. Engagement events lists unsubscribes, forwards and inbound SMS." },
+  { title: "Check an email before it goes", text: "Content > Emails > Checks: unsubscribe link, postal address, subject and preheader, text version, images, links, phone width and Gmail's clipping size. Preview it dark, with images off, or at phone width." },
+  { title: "More about each send", text: "Details on a send: the lists it went to, messages not sent and why, and who unsubscribed. A journey's page shows each email step's sent, opens, clicks and bounces." },
+  { title: "Starter queries and more", text: "Twenty ready-made data view queries to open in Run Query. Subscriber lookup checks every business unit. Ctrl+K also searches emails, content blocks, subscribers and sends by JobID." },
+  { title: "Remove contacts from a journey", text: "Journeys > Remove contacts: paste Contact Keys, load a file or pick a data extension column, review, confirm, and see each contact's exit status. The first Toolkit feature that changes SFMC data; your administrator can turn it off." , earlier: true },
+  { title: "More of SFMC in one place", text: "Subscriber lookup, Contact deletions, Suppression lists, SMS subscriptions, Data model, Sends, Triggered and Transactional sends, Event notifications, Send settings, Users and roles, Business units, File locations and Import results, all read only." , earlier: true },
+  { title: "Recycle bin and clean-up", text: "Find deleted data extensions and Content Builder items, and a report of unused, old and duplicate content. Content > Changes shows what was created or modified, and by whom." , earlier: true },
+  { title: "Journeys and automations as SFMC shows them", text: "Journey pages with status, entry source, re-entry, contacts per step, the audit log, a contact check and contact paths. Automations with Automation Studio's own icons and details." , earlier: true },
+  { title: "Background jobs", text: "Email validation runs in the background, can write to a copy of the data extension, and tells you when it is done. Activity history lists what ran." , earlier: true },
   { title: "Create a data extension with an AI's help", text: "Create DE > Ask an AI: copy a prompt with SFMC's field rules into the AI assistant you use, paste its answer, and the fields, keys and settings are filled in for you to check. The Toolkit sends nothing.", earlier: true },
   { title: "Failed runs say why", text: "When a Run Query run fails, the Toolkit shows SFMC's own reason, and result data extensions no longer drop duplicate rows.", earlier: true },
   { title: "Excel with the SQL", text: "Download any Run Query result as Excel: the SQL on the first sheet, the rows you see on the second.", earlier: true },

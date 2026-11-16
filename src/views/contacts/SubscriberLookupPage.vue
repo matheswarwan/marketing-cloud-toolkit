@@ -5,6 +5,8 @@
 // ListSubscriber + List, BounceEvent, UnsubEvent, SentEvent (utils/contactsLookup.js).
 // Cards load on their own: one failing shows its error and the others still show. The
 // profile attributes SFMC returns are never shown. Read-only: nothing is changed in SFMC.
+// Every business unit (user, 2026-11-16; idea from VeLens): the same person in each BU
+// this login can see, with their status there (SOAP Subscriber with QueryAllAccounts).
 import { computed, reactive, ref } from 'vue'
 import { Loader2, Search, Info } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
@@ -12,9 +14,12 @@ import SfmcErrorNotice from '@/components/results/SfmcErrorNotice.vue'
 import DataTable from '@/components/results/DataTable.vue'
 import DownloadMenu from '@/components/results/DownloadMenu.vue'
 import StatusBadge from '@/components/results/StatusBadge.vue'
-import { useStack } from '@/composables/useStack.js'
+import { useStack, whenStack } from '@/composables/useStack.js'
+import { useRouteSearch } from '@/composables/useRouteSearch.js'
 import { searchError } from '@/utils/sfmcErrors.js'
+import { fetchBusinessUnits } from '@/utils/setupApi.js'
 import {
+  fetchSubscriberAcrossBUs, statusSummary,
   looksLikeEmail, fetchSubscribers, fetchListMemberships, fetchBounces, fetchUnsubscribes, fetchRecentSends, whyNoEmail, RECENT_SENDS,
 } from '@/utils/contactsLookup.js'
 import { formatDateTime } from '@/utils/format.js'
@@ -27,7 +32,7 @@ const matches = ref([]) // subscribers found by email address
 const picked = ref('') // the subscriber key the other cards show
 
 const blank = () => ({ busy: false, error: null, data: null })
-const cards = reactive({ subscriber: blank(), lists: blank(), bounces: blank(), unsubs: blank(), sends: blank() })
+const cards = reactive({ subscriber: blank(), lists: blank(), bounces: blank(), unsubs: blank(), sends: blank(), allBUs: blank() })
 let runId = 0
 
 const byEmail = computed(() => mode.value === 'email' || (mode.value === 'auto' && looksLikeEmail(text.value)))
@@ -76,6 +81,27 @@ async function search() {
   matches.value = cards.subscriber.data || []
   if (matches.value.length) loadKeyCards(matches.value[0].key)
 }
+
+// Every business unit: on request (it reads a row per BU), by the picked key, else by
+// what was searched for.
+let buNames = null
+function loadAllBUs() {
+  const s = stack.value
+  const by = picked.value ? { key: picked.value } : searched.value?.byEmail ? { email: searched.value.value } : { key: searched.value?.value }
+  load('allBUs', 'read the subscriber in every business unit', async () => {
+    if (!buNames) buNames = new Map((await fetchBusinessUnits(s).catch(() => [])).map((b) => [b.mid, b.name]))
+    return fetchSubscriberAcrossBUs(s, { ...by, buNames })
+  }, runId)
+}
+const buCols = [
+  { key: 'businessUnit', label: 'Business unit' }, { key: 'mid', label: 'MID' }, { key: 'status', label: 'Status' }, { key: 'key', label: 'Subscriber key' },
+  { key: 'email', label: 'Email address' }, { key: 'unsubscribed', label: 'Unsubscribed', hidden: true }, { key: 'created', label: 'Created', hidden: true },
+]
+const buRows = computed(() => (cards.allBUs.data || []).map((r, i) => ({ ...r, id: `${r.mid}-${r.key}-${i}`, unsubscribed: formatDateTime(r.unsubscribedDate), created: formatDateTime(r.createdDate) })))
+const buSummary = computed(() => (cards.allBUs.data?.length ? statusSummary(cards.allBUs.data) : ''))
+
+// From Ctrl+K (user, 2026-11-16): ?q=<key or email address>.
+useRouteSearch('/subscribers', (q) => { text.value = q; whenStack(search) })
 
 function pick(key) {
   if (key === picked.value) return
@@ -181,6 +207,21 @@ function getDoc() {
               <dt class="text-muted-foreground">Subscriber ID</dt><dd>{{ subscriber.id }}</dd>
             </dl>
           </template>
+        </div>
+      </section>
+
+      <section class="rounded-lg border border-border bg-card" data-sub-card="allBUs">
+        <div class="px-3 py-2 border-b border-border flex flex-wrap items-center gap-2">
+          <h2 class="text-sm font-semibold">Every business unit</h2>
+          <span v-if="buSummary" class="text-xs text-muted-foreground">{{ buSummary }}</span>
+          <Button size="sm" variant="outline" class="ml-auto" :disabled="cards.allBUs.busy" data-sub-all-bus @click="loadAllBUs"><Loader2 v-if="cards.allBUs.busy" class="h-3.5 w-3.5 animate-spin" />{{ cards.allBUs.data ? 'Check again' : 'Check every business unit' }}</Button>
+        </div>
+        <div class="p-3 text-xs space-y-2">
+          <p v-if="!cards.allBUs.data && !cards.allBUs.busy && !cards.allBUs.error" class="text-muted-foreground">Which business units this person is in, and their status in each: useful when you do not know where they live, or when they are unsubscribed in one unit only. Reads one row per business unit your login can see.</p>
+          <SfmcErrorNotice v-if="cards.allBUs.error" :error="cards.allBUs.error" @retry="loadAllBUs" />
+          <DataTable v-if="cards.allBUs.data" :columns="buCols" :rows="buRows" storage-key="subscriber-all-bus" empty-text="Not found in any business unit this login can see.">
+            <template #cell-status="{ row }"><StatusBadge :status="row.status" /></template>
+          </DataTable>
         </div>
       </section>
 

@@ -313,8 +313,8 @@ export function buildActivityIndex(automations) {
 /**
  * Edges between data extensions, by lower-case name: queries (each table read → its
  * target), filters (source → result), plus imports (a file → DE) and data extracts
- * (DE → a file) as ends. `edges` are { from, to, via: { kind, name, id } } where
- * from/to are names, or null for a file.
+ * (DE → a file) as ends. `edges` are { from, to, via: { kind, name, id }, ent? } where
+ * from/to are names, or null for a file; `ent` when a query reads `from` as ENT.<name>.
  */
 export function lineageEdges({ queries = [], filters = [], imports = [], extracts = [], deNameById = new Map(), deNameByKey = new Map() }) {
   const edges = []
@@ -322,7 +322,7 @@ export function lineageEdges({ queries = [], filters = [], imports = [], extract
     const to = q.targetName || deNameByKey.get(norm(q.targetKey)) || null
     if (!to) continue
     for (const t of tablesInSql(q.queryText)) {
-      edges.push({ from: t.name, to, via: { kind: 'query', name: q.name, id: q.queryDefinitionId } })
+      edges.push({ from: t.name, to, ent: t.ent, via: { kind: 'query', name: q.name, id: q.queryDefinitionId } })
     }
   }
   for (const f of filters) {

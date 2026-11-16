@@ -7,19 +7,18 @@
 import { computed, ref, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
-  X, RefreshCw, Loader2, Check, AlertCircle, Square, Play, ChevronDown, ChevronRight, Network, ArrowLeft, ExternalLink, Minus,
-  FileCode, ArrowDownToLine, ArrowUpFromLine, Filter, Braces, Send, Zap, Route as RouteIcon, LayoutTemplate, Database, Workflow, List, GitBranch,
+  X, RefreshCw, Loader2, Check, AlertCircle, Square, Play, ChevronDown, ChevronRight, Network, ArrowLeft, Minus,
+  FileCode, ArrowDownToLine, ArrowUpFromLine, Filter, Braces, Send, Zap, Route as RouteIcon, LayoutTemplate, Database, Workflow, List, GitBranch, Waypoints,
 } from 'lucide-vue-next'
-import StatusBadge from '@/components/results/StatusBadge.vue'
-import ActivityIcon from '@/components/results/ActivityIcon.vue'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
-import { activityIconKind } from '@/utils/activityIcons.js'
-import CodeView from '@/components/results/CodeView.vue'
 import DownloadMenu from '@/components/results/DownloadMenu.vue'
 import LineageNode from './LineageNode.vue'
+import UsageItemCard from './UsageItemCard.vue'
+import UsageMap from './UsageMap.vue'
+import { buildUsageMap } from '@/utils/usage/graph.js'
+import { layoutUsageMap } from '@/utils/usage/graphLayout.js'
+import { usageMapSvg } from '@/utils/usage/graphSvg.js'
 import { useUsage, targetTitle, targetKindLabel } from '@/composables/useUsage.js'
-import { formatDateTime } from '@/utils/format.js'
-import DERowCount from '@/components/results/DERowCount.vue'
 import AiButton from '@/components/ai/AiButton.vue'
 import AskAiDialog from '@/components/ai/AskAiDialog.vue'
 import { useAi } from '@/composables/useAi.js'
@@ -52,15 +51,12 @@ const scanSub = computed(() => {
   return steps
 })
 function resume() { again() }
-// Activity rows get their type's icon; other kinds (data extension, email, ...) none.
-const isActivityKind = (kind) => activityIconKind(kind) !== 'other' && !/data extension|email$|journey|content|page|file location|profile/i.test(String(kind || ''))
 const sections = computed(() => state.result?.sections || [])
 const total = computed(() => sections.value.reduce((n, s) => n + (s.items?.length || 0), 0))
 const title = computed(() => state.result?.title || targetTitle(state.target))
 
-const openCode = ref(new Set())
 const collapsed = ref(new Set())
-watch(() => state.target, () => { openCode.value = new Set(); collapsed.value = new Set() })
+watch(() => state.target, () => { collapsed.value = new Set() })
 // Separate functions: in the template a ref passed as an argument arrives unwrapped,
 // so a shared toggle(setRef, k) could not replace the Set (feedback #25).
 function flip(set, k) {
@@ -68,15 +64,21 @@ function flip(set, k) {
   next.has(k) ? next.delete(k) : next.add(k)
   return next
 }
-function toggleCode(k) { openCode.value = flip(openCode.value, k) }
 function toggleSection(k) { collapsed.value = flip(collapsed.value, k) }
 
-const TONES = {
-  write: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-  read: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
-  maybe: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
-  info: 'bg-muted text-muted-foreground',
+// Map or list (user, 2026-11-16): the map when the check has one (data extensions and
+// data views), remembered.
+const VIEW_KEY = 'toolkit_usageView'
+function readView() {
+  try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'map' } catch { return 'map' }
 }
+const view = ref(readView())
+function setView(v) {
+  view.value = v
+  try { localStorage.setItem(VIEW_KEY, v) } catch { /* ignore */ }
+}
+const hasMap = computed(() => !!state.result?.map)
+const showingMap = computed(() => hasMap.value && view.value === 'map')
 
 function stageText(s) {
   if (!s) return ''
@@ -116,6 +118,7 @@ function tileCount(s) {
 }
 const body = ref(null)
 async function jumpTo(id) {
+  if (showingMap.value) setView('list')
   if (collapsed.value.has(id)) toggleSection(id)
   await nextTick()
   body.value?.querySelector(`[data-section="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -136,6 +139,11 @@ const summaryOpen = ref(false)
 const summaryPrompt = (extra) => buildAiTaskPrompt('whereUsed', { text: docText(buildDoc()) + (extra.trim() ? `\n\nAlso answer: ${extra.trim()}` : '') })
 function buildDoc() {
   const blocks = [{ type: 'p', text: `${targetKindLabel(state.target)}: ${title.value}. ${total.value} found. Current business unit only.` }]
+  if (state.result?.map) {
+    // The map at its default view (2 levels, automations shown), as in the panel.
+    const svg = usageMapSvg(layoutUsageMap(buildUsageMap(state.result.map, { depth: 2 })))
+    blocks.push({ type: 'h', level: 2, text: 'Map' }, { type: 'svg', svg, note: 'Map: in the HTML and PDF downloads.' })
+  }
   for (const s of sections.value) {
     blocks.push({ type: 'h', level: 2, text: s.title })
     if (s.tree) {
@@ -237,6 +245,12 @@ function buildDoc() {
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-sm font-bold flex-1">Results</span>
           <template v-if="state.result">
+            <div v-if="hasMap" class="flex rounded-full border border-border p-0.5" role="group" aria-label="Show results as">
+              <button type="button" class="h-7 inline-flex items-center gap-1 rounded-full px-2.5 text-xs font-semibold" :class="showingMap ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'"
+                :aria-pressed="showingMap" @click="setView('map')"><Waypoints class="h-3.5 w-3.5" /> Map</button>
+              <button type="button" class="h-7 inline-flex items-center gap-1 rounded-full px-2.5 text-xs font-semibold" :class="!showingMap ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'"
+                :aria-pressed="!showingMap" @click="setView('list')"><List class="h-3.5 w-3.5" /> List</button>
+            </div>
             <AiButton label="Summarize" :disabled="!total" title="Summarize what depends on it (experimental, Gemini Nano in Chrome)" @click="summaryOpen = true" />
             <DownloadMenu :get-doc="buildDoc" :file-name="`where-used-${title}`" label="Download" />
           </template>
@@ -255,7 +269,9 @@ function buildDoc() {
             </button>
           </div>
 
-          <div v-for="s in sections" :key="s.id" :data-section="s.id" class="mt-2 scroll-mt-2">
+          <!-- A fresh canvas per check: vue-flow does not measure a new set of boxes reliably (live test, 2026-11-16). -->
+          <UsageMap v-if="showingMap" :key="`${state.runId}:${state.result.map.focus.id}`" :input="state.result.map" class="mt-1" @follow="follow" />
+          <div v-for="s in (showingMap ? [] : sections)" :key="s.id" :data-section="s.id" class="mt-2 scroll-mt-2">
             <button class="w-full flex items-center gap-1.5 text-left text-sm font-semibold mb-1.5" :aria-expanded="!collapsed.has(s.id)" @click="toggleSection(s.id)">
               <ChevronDown v-if="!collapsed.has(s.id)" class="h-4 w-4" /><ChevronRight v-else class="h-4 w-4" />
               {{ s.title }} <span v-if="!s.tree" class="font-normal text-muted-foreground">({{ s.items.length }})</span>
@@ -278,43 +294,7 @@ function buildDoc() {
 
               <p v-else-if="!s.items.length" class="text-xs text-muted-foreground italic">{{ s.empty }}</p>
               <ul v-else class="space-y-2">
-                <li v-for="m in s.items" :key="m.key" class="rounded-xl border border-border bg-card p-3 text-xs">
-                  <div class="flex flex-wrap items-center gap-1.5">
-                    <span class="inline-flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground"><ActivityIcon v-if="m.activityType != null || isActivityKind(m.kind)" :type="m.activityType ?? m.kind" size="h-3 w-3" />{{ m.kind }}</span>
-                    <button v-if="m.route" class="font-semibold text-sm text-primary hover:underline text-left" @click="go(m.route)">{{ m.title }}</button>
-                    <!-- A data extension opens on Data Extensions with its details (feedback #1098). -->
-                    <button v-else-if="m.pivot?.kind === 'de' && (m.pivot.de?.name || m.title)" class="font-semibold text-sm text-primary hover:underline text-left" data-open-de
-                      :title="`Open ${m.pivot.de?.name || m.title} on Data Extensions`" @click="go(`/data-extensions?q=${encodeURIComponent(m.pivot.de?.name || m.title)}`)">{{ m.title }}</button>
-                    <span v-else class="font-semibold text-sm">{{ m.title }}</span>
-                    <DERowCount v-if="m.pivot?.kind === 'de' && m.pivot.de" :name="m.pivot.de.name || ''" :id="m.pivot.de.id || null" />
-                    <template v-for="(b, bi) in m.badges" :key="bi">
-                      <StatusBadge v-if="b.tone === 'status' && b.text" :status="b.text" />
-                      <span v-else-if="b.text && b.tone !== 'status'" class="rounded-md px-2 py-0.5 text-[11px] font-semibold" :class="TONES[b.tone] || TONES.info">{{ b.text }}</span>
-                    </template>
-                    <div class="flex-1" />
-                    <a v-if="m.href" :href="m.href" target="_blank" rel="noopener" class="inline-flex items-center gap-0.5 text-primary hover:underline">SFMC <ExternalLink class="h-3 w-3" /></a>
-                    <button v-if="m.pivot" class="inline-flex items-center gap-0.5 text-primary hover:underline" :title="`Where is ${m.pivot.de?.name || m.title} used?`" @click="follow(m.pivot)"><Network class="h-3 w-3" /> Where used</button>
-                  </div>
-                  <p v-for="(l, li) in m.lines" :key="li" class="mt-0.5 text-muted-foreground">{{ l }}</p>
-                  <div v-if="m.automations !== undefined" class="mt-1.5">
-                    <p v-if="m.automations === null" class="text-muted-foreground italic">Automations could not be checked.</p>
-                    <p v-else-if="!m.automations.length" class="text-muted-foreground italic">Not in any automation.</p>
-                    <ul v-else class="space-y-1">
-                      <li v-for="a in m.automations" :key="`${a.automationId}-${a.step}`" class="flex flex-wrap items-center gap-1.5">
-                        <button class="text-primary hover:underline font-medium" @click="go(`/automations/${encodeURIComponent(a.automationId)}`)">{{ a.name }}</button>
-                        <span class="text-muted-foreground">step {{ a.step }}{{ a.stepName ? ` (${a.stepName})` : '' }}</span>
-                        <StatusBadge :status="a.status" automation />
-                        <span v-if="a.lastRunTime" class="text-muted-foreground">last run {{ formatDateTime(a.lastRunTime) }}</span>
-                      </li>
-                    </ul>
-                  </div>
-                  <template v-if="m.code?.text">
-                    <button class="mt-1.5 inline-flex items-center gap-1 text-primary hover:underline" :aria-expanded="openCode.has(m.key)" @click="toggleCode(m.key)">
-                      <ChevronDown v-if="openCode.has(m.key)" class="h-3.5 w-3.5" /><ChevronRight v-else class="h-3.5 w-3.5" /> {{ m.code.lang === 'sql' ? 'SQL' : 'Code' }}
-                    </button>
-                    <div v-if="openCode.has(m.key)" class="mt-1.5"><CodeView :code="m.code.text" :lang="m.code.lang" max-height="260px" /></div>
-                  </template>
-                </li>
+                <li v-for="m in s.items" :key="m.key"><UsageItemCard :item="m" @follow="follow" /></li>
               </ul>
             </template>
           </div>

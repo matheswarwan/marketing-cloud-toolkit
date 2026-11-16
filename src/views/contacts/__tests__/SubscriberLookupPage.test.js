@@ -4,6 +4,8 @@ import { ref } from 'vue'
 
 // Subscriber lookup (user, 2026-11-10): cards load on their own and a failing card does not stop the others.
 vi.mock('@/composables/useStack.js', () => ({ useStack: () => ({ stack: ref('s10') }), whenStack: (fn) => fn() }))
+vi.mock('@/composables/useRouteSearch.js', () => ({ useRouteSearch: () => {} }))
+vi.mock('@/utils/setupApi.js', () => ({ fetchBusinessUnits: async () => [{ mid: 100, name: 'Enterprise' }, { mid: 200, name: 'Retail' }] }))
 const calls = []
 let listsFail = false
 vi.mock('@/utils/contactsLookup.js', async (orig) => ({
@@ -20,6 +22,10 @@ vi.mock('@/utils/contactsLookup.js', async (orig) => ({
   },
   fetchBounces: async (s, key) => { calls.push(['bounces', key]); return [] },
   fetchUnsubscribes: async (s, key) => { calls.push(['unsubs', key]); return [] },
+  fetchSubscriberAcrossBUs: async (s, q) => {
+    calls.push(['allBUs', q.key || q.email, [...q.buNames.values()]])
+    return [{ mid: 100, businessUnit: 'Enterprise', key: q.key, email: 'pat@example.com', status: 'Active' }, { mid: 200, businessUnit: 'Retail', key: q.key, email: 'pat@example.com', status: 'Unsubscribed' }]
+  },
   fetchRecentSends: async (s, key) => { calls.push(['sends', key]); return { total: 1, rows: [{ sendId: 42, eventDate: '2026-11-01T00:00:00', triggeredSendId: '' }] } },
 }))
 
@@ -42,6 +48,20 @@ describe('Subscriber lookup page', () => {
     expect(why).toContain('the list Newsletter')
     const link = w.find('[data-sub-card="sends"] a')
     expect(JSON.parse(link.attributes('data-to'))).toEqual({ path: '/sends', query: { q: '42' } })
+  })
+
+  it('checks every business unit only when asked, with the BU names (user, 2026-11-16)', async () => {
+    const w = await mountPage()
+    await w.find('[data-sub-text]').setValue('K1')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+    expect(calls.some((c) => c[0] === 'allBUs')).toBe(false)
+    await w.find('[data-sub-all-bus]').trigger('click')
+    await flushPromises()
+    expect(calls.find((c) => c[0] === 'allBUs')).toEqual(['allBUs', 'K1', ['Enterprise', 'Retail']])
+    const card = w.find('[data-sub-card="allBUs"]').text()
+    expect(card).toContain('Retail')
+    expect(card).toContain('Active in 1, Unsubscribed in 1')
   })
 
   it('shows a card error without hiding the other cards', async () => {

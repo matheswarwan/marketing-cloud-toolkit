@@ -44,17 +44,18 @@ export function parseRetrieve(xml) {
 export const asList = (v) => (v == null ? [] : Array.isArray(v) ? v : [v])
 
 /**
- * Every result of a Retrieve, following MoreDataAvailable up to SOAP_PAGE_LIMIT pages.
+ * Every result of a Retrieve, following MoreDataAvailable up to `pageLimit` pages (2,500
+ * rows each); `rows.capped` is true when SFMC had more.
  * `onPage(rows, total)` gets each page. An "Error: ..." status throws with SFMC's text.
  */
-export async function soapRetrieveAll(stack, objectType, properties, { filter = null, queryAllAccounts = false, onPage = null, retrieve = send } = {}) {
-  let page = parseRetrieve(await retrieve({ stack, objectType, properties, filter, queryAllAccounts }))
+export async function soapRetrieveAll(stack, objectType, properties, { filter = null, queryAllAccounts = false, clientIds = null, onPage = null, retrieve = send, pageLimit = SOAP_PAGE_LIMIT } = {}) {
+  let page = parseRetrieve(await retrieve({ stack, objectType, properties, filter, queryAllAccounts, ...(clientIds ? { clientIds } : {}) }))
   const rows = []
   for (let i = 0; ; i++) {
     if (/^Error/i.test(page.status || '')) throw new Error(`SFMC SOAP: ${page.status}${page.message ? ` ${page.message}` : ''}`)
     rows.push(...page.results)
     onPage?.(page.results, rows.length)
-    if (!/MoreDataAvailable/i.test(page.status || '') || !page.requestId || i + 1 >= SOAP_PAGE_LIMIT) break
+    if (!/MoreDataAvailable/i.test(page.status || '') || !page.requestId || i + 1 >= pageLimit) { if (/MoreDataAvailable/i.test(page.status || '')) rows.capped = true; break }
     page = parseRetrieve(await retrieve({ stack, objectType, properties, continueRequest: page.requestId }))
   }
   return rows

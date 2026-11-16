@@ -239,6 +239,26 @@ describe('findUsage', () => {
     expect(seen).toMatchObject({ queries: 'done', imports: 'done', automations: 'done', emailsends: 'done', journeys: 'done', assets: 'done', analyse: 'done' })
   })
 
+  it('gives the map its input: lineage in reach, every user, automations and entry events', async () => {
+    stub(sfmc)
+    const { findUsage } = await load()
+    const { buildUsageMap } = await import('../usage/graph.js')
+    const r = await findUsage('s7', { kind: 'de', de })
+    expect(r.map.focus).toMatchObject({ id: 'de:orders', label: 'Orders', type: 'de' })
+    const m = buildUsageMap(r.map, { depth: 'all' })
+    const node = (id) => m.nodes.find((n) => n.id === id)
+    const edge = (s, t) => m.edges.find((e) => e.source === s && e.target === t)
+    expect(edge('de:raw', 'act:300:Q1')).toMatchObject({ rel: 'reads' })
+    expect(edge('act:300:Q1', 'de:orders')).toMatchObject({ rel: 'writes' })
+    expect(node('act:300:Q1').sub).toBe('SQL Query · Nightly, step 1')
+    expect(edge('file:43:I1', 'act:43:I1')).toMatchObject({ rel: 'file' })
+    expect(edge('act:43:I1', 'de:orders')).toMatchObject({ rel: 'writes' })
+    expect(edge('de:orders', 'act:423:S1')).toMatchObject({ rel: 'uses', possible: true })
+    expect(edge('de:orders', 'act:e:EV1')).toMatchObject({ rel: 'entry' })
+    expect(edge('act:e:EV1', 'act:j:J1')).toMatchObject({ rel: 'entry' })
+    expect(node('act:j:J1')).toMatchObject({ type: 'journey', label: 'Welcome', parent: 'act:e:EV1' })
+  })
+
   it('reuses the cache and skips automations when nothing needs them', async () => {
     const calls = stub(sfmc)
     const { findUsage } = await load()
@@ -256,6 +276,10 @@ describe('findUsage', () => {
     const { findUsage } = await load()
     const r = await findUsage('s7', { kind: 'field', de, field: 'Amount' })
     expect(titles(r, 'queries')).toEqual(['Use orders', 'No text in list'])
+    const { buildUsageMap } = await import('../usage/graph.js')
+    const fm = buildUsageMap(r.map)
+    expect(r.map.focus).toMatchObject({ type: 'field', label: 'Amount', sub: 'Field of Orders · checked' })
+    expect(fm.edges.find((e) => e.source === r.map.focus.id && e.target === 'act:300:Q2')).toMatchObject({ rel: 'reads' })
     expect(titles(r, 'journeys')).toEqual(['Welcome'])
     expect(titles(r, 'content')).toEqual(['Receipt'])
   })
@@ -266,6 +290,15 @@ describe('findUsage', () => {
     const r = await findUsage('s7', { kind: 'activity', typeId: 300, activityObjectId: 'Q2', name: 'Use orders', details: QUERIES[1] })
     expect(r.sections[0].items.map((i) => [i.title, i.lines[0]])).toEqual([['Nightly', 'Step 2']])
     expect(titles(r, 'tables')).toEqual(['Report', 'Orders'])
+    // Map: the automation above it, the DE it reads before it and the DE it writes after.
+    const { buildUsageMap } = await import('../usage/graph.js')
+    const m = buildUsageMap(r.map)
+    const focus = r.map.focus.id
+    expect(r.map.focus).toMatchObject({ type: 'query', label: 'Use orders' })
+    expect(m.edges.find((e) => e.source === 'auto:A1' && e.target === focus)).toMatchObject({ rel: 'runs', label: 'step 2' })
+    expect(m.nodes.find((n) => n.id === 'auto:A1').band).toBe(true)
+    expect(m.edges.find((e) => e.source === 'de:orders' && e.target === focus)).toMatchObject({ rel: 'reads' })
+    expect(m.edges.find((e) => e.source === focus && e.target === 'de:report')).toMatchObject({ rel: 'writes' })
   })
 
   it('lists what an automation touches', async () => {
@@ -283,6 +316,13 @@ describe('findUsage', () => {
     expect(titles(r, 'reads')).toEqual(['Orders', 'Raw'])
     expect(r.sections.find((s) => s.id === 'files').items[0].title).toMatch(/orders\.csv/)
     expect(titles(r, 'emails')).toEqual(['Monthly send'])
+    const { buildUsageMap } = await import('../usage/graph.js')
+    const m = buildUsageMap(r.map)
+    expect(r.map.focus).toMatchObject({ type: 'automation', label: 'Nightly' })
+    expect(m.edges.find((e) => e.source === 'de:raw' && e.target === r.map.focus.id)).toMatchObject({ rel: 'reads' })
+    expect(m.edges.find((e) => e.target === 'de:report')).toMatchObject({ rel: 'writes' })
+    expect(m.nodes.find((n) => n.id === 'de:report').sub).toBe('Data extension')
+    expect(m.nodes.some((n) => n.type === 'send' && n.label === 'Monthly send')).toBe(true)
   })
 
   it('finds journeys for an entry event, an email, a content block, a file location and profiles', async () => {
@@ -299,6 +339,19 @@ describe('findUsage', () => {
     expect(titles(loc, 'transfers')).toEqual(['Get file'])
     const prof = await findUsage('s7', { kind: 'profiles', profileType: 'sender' })
     expect(prof.sections.map((s) => [s.title, s.items.map((i) => i.title)])).toEqual([['Marketing (SP2)', ['Monthly send']], ['SP1', ['Welcome']]])
+    // Every kind has a map with something next to its focus.
+    const { buildUsageMap } = await import('../usage/graph.js')
+    const ev = await findUsage('s7', { kind: 'event', event: { id: 'EV1', name: 'Orders entry', eventDefinitionKey: 'DEAudience-1', dataExtensionName: 'Orders', dataExtensionId: 'DE-1' } })
+    const em = buildUsageMap(ev.map)
+    expect(em.edges.find((e) => e.source === 'de:orders' && e.target === ev.map.focus.id)).toMatchObject({ rel: 'entry' })
+    expect(em.edges.find((e) => e.source === ev.map.focus.id && e.target === 'act:j:J1')).toMatchObject({ rel: 'entry' })
+    const mm = buildUsageMap(email.map)
+    expect(mm.edges.filter((e) => e.rel === 'sends').map((e) => e.target).sort()).toEqual(['act:42:E1', 'act:j:J1'])
+    expect(mm.nodes.some((n) => n.id === 'auto:A1')).toBe(true) // the Send Email activity's automation
+    expect(buildUsageMap(block.map).edges.map((e) => e.target)).toEqual(['act:a:10'])
+    expect(buildUsageMap(loc.map).nodes.map((n) => n.type).sort()).toEqual(['automation', 'import', 'location', 'transfer'])
+    const pm = buildUsageMap(prof.map)
+    expect(pm.nodes.filter((n) => n.type === 'profile').map((n) => n.label)).toEqual(['Sender profiles', 'Marketing (SP2)', 'SP1'])
   })
 
   it('checks every journey version and names the automation behind an entry event (live test, 2026-11-07)', async () => {

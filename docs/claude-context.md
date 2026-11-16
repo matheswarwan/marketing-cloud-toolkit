@@ -58,7 +58,7 @@ Page helpers: `utils/sfmcApi.js` `sfmcFetch(url, method, body)` (via `SFMC_FETCH
 - Core (`mc.<s>.exacttarget.com`): cookies + CSRF sniffed from SFMC's own requests (`csrf.js`, 14 min, session storage).
 - `*.marketingcloudapps.com` apps: Bearer token minted by opening `AutomationStudioFuel3/update-token.json` in an inactive tab, read by `content.js` (`mcaToken.js`). Content Builder writes add the `_csrf` cookie as a header; Journey Builder CSRF from `jbCsrf.js`; Contacts headers from `pageHeaders.js`.
 - Missing session: `sessions.js` opens the app's landing in an inactive tab until its probe returns 200, then retries once (`fetchProxy.js`).
-- No SOAP anywhere: only internal app REST APIs (`/fuelapi/...`). Base URLs: `sfmcApi.js` (core), `automationApi.js`, `deApi.js`/`contactsApi.js` (contactsmeta), `journeyApi.js` (jbinteractions), `cloudPagesApi.js` (content-builder, cloud-pages), `storageApi.js` (mc-data-ui).
+- Mostly internal app REST APIs (`/fuelapi/...`). SOAP only for read-only Retrieve of an allowlist (`SOAP_OBJECTS` in `background/soap.js`: users, roles, BUs, sends, triggered sends, subscribers, lists, bounce/unsub/sent events, profiles, import results, suppression lists) with the MCA token as `<fueloauth>`; a new object type must be added there. Base URLs: `sfmcApi.js` (core), `automationApi.js`, `deApi.js`/`contactsApi.js` (contactsmeta), `journeyApi.js` (jbinteractions), `cloudPagesApi.js` (content-builder, cloud-pages), `storageApi.js` (mc-data-ui).
 - New API call: put it in the matching `*Api.js`, use its base-URL helper with `stack`, accept `fetch = sfmcFetch` for tests, wrap UI calls in `withReconnect` + `searchError` (`utils/sfmcErrors.js`) and show `SfmcErrorNotice`.
 
 ## Automation Studio links
@@ -115,6 +115,24 @@ Worker: `background/policy.js`; pages: `utils/policy.js` (`policy`, `isPolicyOn`
 - Background jobs (#1092): `composables/useJobs.js` (module state for the app tab: `startJob({ kind, title, path, data, run })`, `job.progress`, `job.stopRequested`, `stopJob`; asks before the tab closes while one runs), pure parts in `utils/jobs.js`. History in `chrome.storage.local` `toolkit_job_history` (last 50, metadata only, `maskEmails`); results in memory for the last 5 finished jobs. On end: MessageBar message with `action` link (showToast `opts.action`), bell section in NoticesMenu, header `JobsPill`, Chrome notification via `JOB_NOTIFY` (`background/jobNotify.js`, only when the optional notifications permission is granted; click focuses the tab via `runtime.getContexts`). Page `/activity` (`views/info/ActivityHistoryPage.vue`, hidden route, linked from the bell).
 
 - Suppression lists and SMS subscriptions (API ideas 16, 17; 2.0.23, not checked live): `utils/suppressionLists.js` (SOAP SuppressionListDefinition + SuppressionListContext, property lists with fallbacks via `retrieveWithFallbacks`), `utils/smsSubscriptions.js` (REST POST `sms/v1/contacts/subscriptions` on the jbinteractions host, assumed; refusal = note). The SMS call uses `sfmcFetchQuiet` (sfmcApi.js): body, answer and digit runs in errors stay out of the API console and recent calls.
+
+## Where used map (2.0.24, user 2026-11-16)
+
+- Every Where used result carries `result.map` (`mapInput()` in `utils/usage/graph.js`): the focus box, lineage edges in reach (data extensions only), the result items, and `uses` (how each item uses the focus: type, `in`/`out`, edge kind).
+- `buildUsageMap(input, { depth, expanded, automations })` gives nodes with a `level` relative to the focus and a `parent`; `layoutUsageMap()` (dagre LR, only forward edges with `minlen` = level gap, automations in a band above, loops back under the map) gives positions, paths and arrowheads; `usageMapSvg()` draws the same picture.
+- UI: `components/usage/UsageMap.vue` (vue-flow), `UsageMapNode.vue`, `UsageMapEdge.vue`; the result card is `UsageItemCard.vue` (list and map details). Settings in localStorage: `toolkit_usageView`, `toolkit_usageMapDepth`, `toolkit_usageMapAutomations`.
+- vue-flow: nodes that are neither selectable nor draggable get `pointer-events: none` unless `<VueFlow>` has node listeners, so the map forces it in CSS; it drops view changes made before its pane is ready, so the view is set on nodes initialised, pane ready and once more.
+- Design idea from VeLens for Marketing Cloud (no licence): no code taken.
+
+## Ideas from VeLens (2.0.24, user 2026-11-16, branch `velens-ideas`)
+
+- Email checks (`utils/emailChecks.js`) and preview modes Dark, Images off, Mobile (`utils/emailPreviewModes.js`) on Content > Emails. Preview styles are injected after `<head>`/`<body>`/`<html>`/doctype, never before the doctype (quirks mode).
+- Send problems (`/send-problems`), Engagement events (`/engagement-events`), Send details on Sends (`components/sending/SendDetails.vue`): `utils/sendEvents.js` over SOAP BounceEvent, NotSentEvent, ListSend, UnsubEvent, ForwardedEmailEvent, ForwardedEmailOptInEvent, SMSMOEvent (only EventDate, MOCode, Carrier answer). Feeds read at most 4 pages (10,000 events) and say when capped (`rows.capped` from `soapRetrieveAll` `pageLimit`).
+- Journey Email results (`components/journey/JourneyEmailResults.vue`): email activity `configurationArguments.triggeredSendKey` → TriggeredSendSummary.
+- Subscriber in every business unit: SOAP Subscriber with QueryAllAccounts gives one row per BU with Client.ID (ClientIDs with every MID answered for the current BU only).
+- Starter queries (`data/starterQueries.js`, `/queries/starter`): tests lint every query and check every data view field.
+- Ctrl+K search actions can carry extra query (`kind`) and a `when(text)` test; `useRouteSearch` passes the whole query to its handler.
+- SOAP builder: one-value `IN` is sent as `equals` (SFMC refuses IN with one value); `clientIds` adds `<ClientIDs>`.
 
 ## UI conventions
 

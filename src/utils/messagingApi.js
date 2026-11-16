@@ -160,3 +160,46 @@ export function userFlags(u, now = Date.now()) {
   if (u.locked) flags.push('Locked')
   return flags
 }
+
+// ── Journey email results (SOAP) ──────────────────────────
+// User, 2026-11-16 (idea from VeLens's journey panel): all-time numbers for each email step
+// of a journey version. A journey email activity has a triggered send behind it, named by
+// configurationArguments.triggeredSendKey (checked live on s10: TK_Paths_Test_Journey's
+// email has key 206444, and TriggeredSendSummary answers Sent 5 for it).
+
+/** Email steps of a journey version that have a triggered send: [{ key, name, triggeredSendKey, emailName }]. */
+export function journeyEmailSteps(journey) {
+  return (journey?.activities || [])
+    .filter((a) => /^EMAIL/i.test(a.type || '') && a.configurationArguments?.triggeredSendKey)
+    .map((a) => ({
+      key: a.key, name: a.name || a.key, triggeredSendKey: String(a.configurationArguments.triggeredSendKey),
+      emailName: a.configurationArguments?.triggeredSend?.emailName || a.metaData?.emailName || '',
+    }))
+}
+
+/** Each email step with its all-time counts (null when SFMC has none for its key). */
+export async function fetchJourneyEmailResults(stack, journey, { retrieve } = {}) {
+  const steps = journeyEmailSteps(journey)
+  if (!steps.length) return []
+  const keys = [...new Set(steps.map((s) => s.triggeredSendKey))]
+  const rows = []
+  for (let i = 0; i < keys.length; i += 2500) {
+    rows.push(...await soapRetrieveAll(stack, 'TriggeredSendSummary', TSS_PROPS, { filter: { property: 'CustomerKey', operator: 'IN', values: keys.slice(i, i + 2500) }, ...(retrieve ? { retrieve } : {}) }))
+  }
+  const byKey = new Map(rows.map((r) => [String(r.CustomerKey), r]))
+  return steps.map((s) => {
+    const r = byKey.get(s.triggeredSendKey)
+    if (!r) return { ...s, counts: null }
+    const sent = num(r.Sent)
+    const bounces = num(r.Bounces)
+    return {
+      ...s,
+      counts: {
+        sent, bounces, delivered: sent != null && bounces != null ? Math.max(0, sent - bounces) : null,
+        opens: num(r.UniqueOpens ?? r.Opens), clicks: num(r.UniqueClicks ?? r.Clicks), optOuts: num(r.OptOuts),
+        notSentError: num(r.NotSentDueToError), notSentOptOut: num(r.NotSentDueToOptOut), notSentUndeliverable: num(r.NotSentDueToUndeliverable),
+        queued: num(r.Queued),
+      },
+    }
+  })
+}

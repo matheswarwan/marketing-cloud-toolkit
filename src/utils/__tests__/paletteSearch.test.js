@@ -19,8 +19,12 @@ describe('paletteEntries', () => {
     const r = paletteEntries('orders', sections, storage)
     expect(r.filter((e) => e.kind === 'query')).toEqual([{ kind: 'query', label: 'Join', hint: 'Query Builder', to: { path: '/queries/builder', query: { id: 'sql_2' } } }])
     expect(r.find((e) => e.kind === 'email').to).toEqual({ path: '/emails/email_7' })
-    expect(r.filter((e) => e.kind === 'search').map((e) => e.to.path)).toEqual(['/data-extensions', '/automations', '/activities', '/journeys', '/journey-entry', '/cloudpages'])
+    expect(r.filter((e) => e.kind === 'search').map((e) => e.to.path)).toEqual(['/data-extensions', '/automations', '/activities', '/journeys', '/journey-entry', '/cloudpages',
+      '/emails', '/where-used', '/where-used', '/subscribers', '/queries/starter'])
     expect(r.find((e) => e.kind === 'search').to.query).toEqual({ q: 'orders' })
+    // Where used carries the kind; Sends by JobID only for a number (user, 2026-11-16).
+    expect(r.filter((e) => e.to.path === '/where-used').map((e) => e.to.query)).toEqual([{ kind: 'block', q: 'orders' }, { kind: 'de', q: 'orders' }])
+    expect(paletteEntries('441901', sections, storage).find((e) => e.to.path === '/sends').to.query).toEqual({ q: '441901' })
   })
 
   it('matches sections by name and skips never-typed panels', () => {

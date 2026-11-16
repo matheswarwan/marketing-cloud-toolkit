@@ -3,6 +3,8 @@
 // last days, with SFMC's numbers (targeted, sent, delivered, bounces, opens, clicks,
 // unsubscribes, exclusions). SOAP Send. Read-only.
 // ?q=<JobID> opens one send (links from Subscriber lookup, user, 2026-11-10).
+// Details (user, 2026-11-16): the lists a send went to, messages not sent and why, and its
+// unsubscribes (components/sending/SendDetails.vue); open for a JobID search, or Details.
 import { computed, ref } from 'vue'
 import { Loader2, Search } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
@@ -10,6 +12,7 @@ import SfmcErrorNotice from '@/components/results/SfmcErrorNotice.vue'
 import DataTable from '@/components/results/DataTable.vue'
 import DownloadMenu from '@/components/results/DownloadMenu.vue'
 import StatusBadge from '@/components/results/StatusBadge.vue'
+import SendDetails from '@/components/sending/SendDetails.vue'
 import { useStack, whenStack } from '@/composables/useStack.js'
 import { useRouteSearch } from '@/composables/useRouteSearch.js'
 import { searchError } from '@/utils/sfmcErrors.js'
@@ -23,7 +26,9 @@ const list = ref(null)
 const shown = ref('')
 const busy = ref(false)
 const error = ref(null)
+const details = ref(null) // { jobId, emailName }
 async function run(byJob) {
+  details.value = null
   busy.value = true
   error.value = null
   try {
@@ -32,6 +37,7 @@ async function run(byJob) {
       if (!/^\d+$/.test(id)) { error.value = 'A JobID is a number.'; return }
       list.value = await fetchSends(stack.value, { jobId: id })
       shown.value = `JobID ${id}`
+      if (list.value.length === 1) details.value = { jobId: list.value[0].jobId, emailName: list.value[0].emailName }
     } else {
       const n = Math.min(Math.max(Math.floor(Number(days.value)) || 30, 1), 365)
       list.value = await fetchSends(stack.value, { since: new Date(Date.now() - n * 86400000).toISOString().slice(0, 19) })
@@ -90,7 +96,12 @@ const getDoc = () => ({ title: shown.value || 'Sends', blocks: [{ type: 'table',
       <div class="px-3 py-2 border-b border-border text-xs">{{ shown }}: {{ rows.length }} {{ rows.length === 1 ? 'send' : 'sends' }}. Opens and clicks are unique, rates against delivered.</div>
       <DataTable :columns="columns" :rows="tableRows" storage-key="sends" empty-text="No sends found.">
         <template #cell-status="{ row }"><StatusBadge :status="row.status" /></template>
+        <template #cell-jobId="{ row }">
+          <span class="inline-flex items-center gap-1.5">{{ row.jobId }}
+            <button type="button" class="text-primary hover:underline text-[11px]" :aria-pressed="details?.jobId === row.jobId" :data-send-details-open="row.jobId" @click="details = { jobId: row.jobId, emailName: row.emailName }">Details</button></span>
+        </template>
       </DataTable>
     </section>
+    <SendDetails v-if="details" :job-id="details.jobId" :email-name="details.emailName" @close="details = null" />
   </div>
 </template>

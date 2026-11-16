@@ -12,6 +12,7 @@ import JourneyCanvas from '@/components/journey/JourneyCanvas.vue'
 import JourneyContactCheck from '@/components/journey/JourneyContactCheck.vue'
 import JourneyPathsControl from '@/components/journey/JourneyPathsControl.vue'
 import JourneyExitDialog from '@/components/journey/JourneyExitDialog.vue'
+import JourneyEmailResults from '@/components/journey/JourneyEmailResults.vue'
 import { policy } from '@/utils/policy.js'
 import ActivityCard from '@/components/results/ActivityCard.vue'
 import StatusBadge from '@/components/results/StatusBadge.vue'
@@ -249,6 +250,7 @@ const summaryPrompt = (extra) => buildAiTaskPrompt('journey', { text: docText(jo
         <div class="mx-4 mb-4">
           <JourneyCanvas :key="`${journey.id}:${journey.version}`" ref="canvas" :graph="graph" :layout="layout" :orientation="orientation" :selected="selected" :counts="pathCounts" :population="pathCounts ? null : population" @select="selectActivity" />
         </div>
+        <JourneyEmailResults :key="`results:${journey.id}:${journey.version}`" class="mx-4 mb-4" :stack="stack" :journey="journey" />
         <section class="mx-4 mb-4 rounded-lg border border-border bg-card text-xs" data-journey-audit>
           <button type="button" class="w-full flex items-center gap-1.5 px-3 py-2 text-sm font-semibold" :aria-expanded="audit.open" @click="toggleAudit">
             <ChevronDown v-if="audit.open" class="h-4 w-4" /><ChevronRight v-else class="h-4 w-4" /> Changes to this journey

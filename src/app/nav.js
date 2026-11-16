@@ -2,7 +2,7 @@
 // Queries, Data, Contacts, Automation, Journeys, Content (feedback #128, regrouped in
 // the redesign, #1031). `hidden` pages have a route but no sidebar entry.
 import {
-  Bookmark, LayoutGrid, Blocks, Workflow, ListChecks, Database, Route, LogIn, Globe, Mail, Network, Trash2, LayoutTemplate, LayoutDashboard, Users, HardDrive, FilePlus2, History, MailCheck, Footprints, House, FileClock, ShieldCheck, Package, Newspaper, CalendarClock, Send, Zap, BellRing, MailOpen, UserCog, UserSearch, UserX, Share2, ArchiveRestore, FileInput, SlidersHorizontal, Building2, ShieldBan, MessageSquareText, Eraser, FolderInput } from 'lucide-vue-next'
+  Bookmark, LayoutGrid, Blocks, Workflow, ListChecks, Database, Route, LogIn, Globe, Mail, Network, Trash2, LayoutTemplate, LayoutDashboard, Users, HardDrive, FilePlus2, History, MailCheck, Footprints, House, FileClock, ShieldCheck, Package, Newspaper, CalendarClock, Send, Zap, BellRing, MailOpen, UserCog, UserSearch, UserX, Share2, ArchiveRestore, FileInput, SlidersHorizontal, Building2, ShieldBan, MessageSquareText, Eraser, FolderInput, LibraryBig, MailWarning, Activity } from 'lucide-vue-next'
 
 export const NAV_GROUPS = [
   // Home (feedback #1025): the start page, in a group without a heading.
@@ -13,6 +13,7 @@ export const NAV_GROUPS = [
       { path: '/queries/workspace', name: 'Run Query', icon: LayoutGrid },
       { path: '/queries/builder', name: 'Query Builder', icon: Blocks },
       { path: '/queries/saved', name: 'Saved queries', icon: Bookmark },
+      { path: '/queries/starter', name: 'Starter queries', icon: LibraryBig },
     ],
   },
   {
@@ -82,6 +83,8 @@ export const NAV_GROUPS = [
       { path: '/transactional', name: 'Transactional messages', icon: Send },
       { path: '/triggered-sends', name: 'Triggered sends', icon: Zap },
       { path: '/sends', name: 'Sends', icon: MailOpen },
+      { path: '/send-problems', name: 'Send problems', icon: MailWarning },
+      { path: '/engagement-events', name: 'Engagement events', icon: Activity },
       { path: '/event-notifications', name: 'Event notifications', icon: BellRing },
       { path: '/send-settings', name: 'Send settings', icon: SlidersHorizontal },
     ],

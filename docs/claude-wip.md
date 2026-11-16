@@ -1,5 +1,31 @@
 # Work in progress
 
+## Release 2.0.24 (2026-11-16): waiting on the author
+
+- PR #14 (`release-2.0.24` into main) holds PR #13 (Where used map), `velens-ideas` (8 features), the version bump and `releases/sfmc-toolkit-2.0.24.zip` (built from efd04a0 with `package.mjs --ci`, SHA-256 e9dab0b55ff93c3964bbe5648f2dfa9cf38d23fee0ce0a696e6ae3cea4071fcc).
+- Claude could not merge: main needs one approving review, and the admin bypass was refused by auto mode. The author merges PR #14 (PR #13 then shows as merged).
+- After the merge: the author writes `## 2.0.24 (date)` in CHANGELOG.md, then tags `v2.0.24` (release.yml builds the GitHub release from that section) and uploads the zip to the Chrome Web Store.
+- Test report with screenshots (private artifact): https://claude.ai/artifact/2CJSGsKes7gpJKRZYr2iKp
+
+## Ideas from VeLens (2026-11-16, branch `velens-ideas`, on top of `where-used-map`)
+
+All 8 agreed features built, unit-tested and checked live on s10 Mathes Sandbox: email checks, send problems, send details, journey email results, starter queries, dark/images-off/mobile previews, subscriber in every BU, engagement events plus more Ctrl+K searches.
+- Skipped on purpose: VeLens's AI features (send data to their server) and in-SFMC side panels.
+- Live testing notes: Puppeteer element-handle calls and screenshots hang or fail on app pages with the sandboxed srcdoc preview iframe; use raw CDP (`scripts/raw.mjs`, `frames.mjs` in the session scratchpad) and close stale tabs via `/json/close`. Out-of-process preview frames cannot be screenshotted; render the transformed HTML in headless Chrome instead.
+- One transient "No Marketing Cloud session for SOAP" on the first SOAP call after a while; the retry worked (existing token flow).
+
+## Where used map (2026-11-16, branch `where-used-map`, not committed)
+
+Goal (user): show Where used as a flow chart, like the VeLens extension's dependency map (`~/Downloads/VeLens for Marketing Cloud`, no licence, so ideas only, our own code).
+All three agreed phases are built and checked live on s10 Mathes Sandbox (user logged in to a test Chrome, see below); waiting for the user to review and say commit.
+- Phase 1: map for data extensions and data views, Map / List switch in the results (list kept), lineage levels 1, 2, All, "+N more" folds.
+- Phase 2: automations band above the steps they run (lines go down the gap beside a column when boxes are in the way), paused and error states, ENT. ghosts, the key as a filter, PNG and SVG download, map in the HTML and PDF downloads.
+- Phase 3: maps for field, activity, automation, entry event, email, content block, file location and profiles (hub boxes).
+- Code: `utils/usage/graph.js` (model), `graphLayout.js` (dagre plus band), `graphSvg.js` (picture), `kinds.js` (`withMap`, `usesBySection`, a map per kind), `components/usage/UsageMap*.vue`, `UsageItemCard.vue`.
+- Live bugs found and fixed: vue-flow nodes had `pointer-events: none`; fit before measure; a new check in the same canvas kept the old view (map now keyed per check, view set on nodes initialised, pane ready and 350 ms later); double fold of lineage queries; label pile-up; band lines through boxes; text overflow in the picture.
+- Test browser: Chrome for Testing, profile `SideQuest/.claude-toolkit-browser`, CDP port 9334, `dist/` loaded, extension ID bciaecejilkagpjohkjglgmlknninfln, launched with `--enable-unsafe-extension-debugging`. Reload the extension after a build with `chrome.runtime.reload()` from an extension page, then open a fresh tab (old tabs die and CDP calls into them hang). Puppeteer element-handle calls hang on the app page; drive it with `page.evaluate`. Scripts in the session scratchpad (`scripts/lib.mjs`, `cdp.mjs`).
+- Not done: Content Builder was not connected in the test browser at first (403 EBADCSRFTOKEN in the assets step of one scan); it connected on its own later.
+
 ## Resume here (end of 2026-11-08)
 
 Code (branch `fixes-from-live-testing`, all pushed, last commit f6e7f4e, full suite 1,624 tests passing, build and manifest guard OK):
