@@ -9,7 +9,7 @@
 export const TO_TEST = [
   {
     version: '2.0.24',
-    status: 'In progress (branches where-used-map, velens-ideas)',
+    status: 'Packaged for the Chrome Web Store',
     items: [
       {
         id: '2.0.24-send-problems', area: 'Sending', title: 'Send problems and engagement events', ref: 'user, 2026-11-16', from: 'Mathes', live: false,
