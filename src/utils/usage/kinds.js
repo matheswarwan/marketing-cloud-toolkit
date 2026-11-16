@@ -7,9 +7,10 @@
 //              code?: { text, lang }, activityObjectId?, automations?, pivot? }
 import { sfmcFetch } from '../sfmcApi.js'
 import { describeActivity, activityTypeLabel, activityEndpoint, UPDATE_TYPES } from '../activityTypes.js'
-import { formatDateTime, plural } from '../format.js'
+import { formatDateTime, plural, statusWords } from '../format.js'
 import { runInBatches } from '../batchRunner.js'
 import { SOURCES, assetGroup } from './sources.js'
+import { mapInput, reachableLineage, viaKey, useOf, activityMapType } from './graph.js'
 import { eventAutomationId } from '../journeyApi.js'
 import { primaryVersion } from '../journeys.js'
 import {
@@ -46,7 +47,7 @@ function activityItem(stack, typeId, details, extra = {}) {
 // Draft version 3 hid the Published version 2). One item per journey, for the matching
 // versions: it opens the published (or otherwise live) one, else the newest, and lists
 // the others with their status.
-function journeyItem(j, reasons, others = []) {
+function journeyItem(j, reasons, others = [], extra = {}) {
   return {
     key: `j:${j.id}`,
     kind: 'Journey',
@@ -58,20 +59,25 @@ function journeyItem(j, reasons, others = []) {
     journeyId: j.id,
     version: j.version ?? null,
     status: j.status || '',
+    ...extra,
   }
 }
 
-/** Items for matching journey versions: `matches` is [[journeyVersion, reasons]]. */
+/**
+ * Items for matching journey versions: `matches` is [[journeyVersion, reasons, extra?]];
+ * `extra` (such as the entry event keys, for the map) goes onto the item.
+ */
 function journeyItems(matches) {
   const byId = new Map()
-  for (const [j, reasons] of matches) {
+  for (const [j, reasons, extra] of matches) {
     if (!byId.has(j.id)) byId.set(j.id, [])
-    byId.get(j.id).push({ j, reasons })
+    byId.get(j.id).push({ j, reasons, extra })
   }
   return [...byId.values()].map((list) => {
     const main = primaryVersion(list.map((m) => m.j))
     const others = list.map((m) => m.j).filter((j) => j !== main).sort((a, b) => (Number(b.version) || 0) - (Number(a.version) || 0))
-    return journeyItem(main, list.find((m) => m.j === main).reasons, others)
+    const m = list.find((x) => x.j === main)
+    return journeyItem(main, m.reasons, others, m.extra)
   })
 }
 
@@ -148,8 +154,7 @@ async function analyseDE(target, ctx) {
   if (de.dataView) {
     const edges = lineageEdges({ queries: queries?.items || [] })
     sections.unshift({ id: 'lineage', title: 'Lineage', tree: { up: null, down: lineageTree(edges, de.name, 'down') }, items: [] })
-    await attachAutomations(ctx, sections)
-    return { sections }
+    return withMap(ctx, de, sections, edges, { queries: queries?.items || [] })
   }
 
   const ids = [de.id, de.customerKey].filter(Boolean)
@@ -212,7 +217,8 @@ async function analyseDE(target, ctx) {
     if (findValues(j.activities, ids).length) reasons.push('Named in an activity (such as Update Contact)')
     const paths = findPathMentions({ activities: j.activities, goals: j.goals, exits: j.exits }, de.name)
     if (paths.length) reasons.push('In split, goal or exit criteria')
-    if (reasons.length) journeyMatches.push([j, [reasons.join('; ')]])
+    const entryKeys = trig ? [trig.metaData?.eventDefinitionKey || trig.configurationArguments?.eventDefinitionKey] : []
+    if (reasons.length) journeyMatches.push([j, [reasons.join('; ')], { entryKeys }])
   }
   sections.push(section('journeys', 'Journeys', journeyItems(journeyMatches), { source: journeys, note: journeys?.errors ? `${plural(journeys.errors, 'journey version')} could not be read.` : '' }))
 
@@ -237,9 +243,28 @@ async function analyseDE(target, ctx) {
   const maps = nameMaps(queries?.items || [], de)
   const edges = lineageEdges({ queries: queries?.items || [], filters: filters?.items || [], imports: imports?.items || [], extracts: extracts?.items || [], ...maps })
   sections.unshift({ id: 'lineage', title: 'Lineage', tree: { up: lineageTree(edges, de.name, 'up'), down: lineageTree(edges, de.name, 'down') }, items: [] })
+  return withMap(ctx, de, sections, edges, { queries: queries?.items || [], filters: filters?.items || [], imports: imports?.items || [], extracts: extracts?.items || [] })
+}
 
-  await attachAutomations(ctx, sections)
-  return { sections }
+// The map (graph.js): items for lineage activities further away than the sections
+// reach, so every box has a name, a link to SFMC and its automations.
+const VIA_SOURCE = {
+  query: ['queries', 300, 'queryDefinitionId'], filter: ['filters', 303, 'filterActivityId'],
+  import: ['imports', 43, 'importDefinitionId'], extract: ['extracts', 73, 'dataExtractDefinitionId'],
+}
+async function withMap(ctx, de, sections, edges, lists) {
+  const reach = reachableLineage(edges, de.name)
+  const known = new Set(sections.flatMap((s) => (s.items || []).map((i) => i.key)))
+  const extra = new Map()
+  for (const e of reach) {
+    const key = viaKey(e.via)
+    if (known.has(key) || extra.has(key)) continue
+    const [list, typeId, idField] = VIA_SOURCE[e.via.kind]
+    const details = (lists[list] || []).find((x) => String(x[idField]) === String(e.via.id))
+    if (details) extra.set(key, activityItem(ctx.stack, typeId, details))
+  }
+  await attachAutomations(ctx, [...sections, { items: [...extra.values()] }])
+  return { sections, map: mapInput({ de, edges: reach, sections, extraItems: [...extra.values()] }) }
 }
 
 // ── One field of a DE ─────────────────────────────────────
@@ -278,7 +303,14 @@ async function analyseField(target, ctx) {
     sections.push(section('content', 'Emails, templates, content blocks and CloudPages', aItems, { source: assets, note: 'Lookup and similar calls on this data extension that name the field.' }))
   }
   await attachAutomations(ctx, sections)
-  return { sections }
+  const uses = []
+  for (const i of items) {
+    const writes = i.badges.some((b) => b.tone === 'write')
+    uses.push(useOf(i, 'query', writes ? 'in' : 'out', writes ? 'writes' : 'reads'))
+  }
+  for (const x of sections.filter((y) => y.id !== 'queries')) for (const i of x.items) uses.push(useOf(i, x.id === 'journeys' ? 'journey' : 'content', 'out', 'uses'))
+  const focus = { id: `focus:field:${norm(de.name)}.${norm(field)}`, type: 'field', label: field, sub: `Field of ${de.name} · checked` }
+  return { sections, map: mapInput({ focus, sections, uses }) }
 }
 
 // ── One automation activity ───────────────────────────────
@@ -292,6 +324,8 @@ async function analyseActivity(target, ctx) {
       badges: [{ text: a.status || '', tone: 'status' }],
       lines: [`Step ${e.step}${e.stepName ? ` (${e.stepName})` : ''}${e.activityName ? `: ${e.activityName}` : ''}`, a.lastRunTime ? `Last run ${formatDateTime(a.lastRunTime)}` : ''].filter(Boolean),
       route: `/automations/${encodeURIComponent(e.automationId)}`,
+      automationId: e.automationId,
+      step: e.step,
     }
   })
   const sections = [section('automations', 'Automations', items, { source: autos, empty: 'Not in any automation.' })]
@@ -301,7 +335,14 @@ async function analyseActivity(target, ctx) {
     const writes = q.targetName ? [{ key: `w:${q.targetName}`, kind: 'Data extension', title: q.targetName, badges: [{ text: `Writes${q.targetUpdateTypeName ? `: ${q.targetUpdateTypeName}` : ''}`, tone: 'write' }], lines: [], pivot: { kind: 'de', de: { name: q.targetName, customerKey: q.targetKey, id: q.targetId } } }] : []
     sections.push(section('tables', 'Data extensions', [...writes, ...reads]))
   }
-  return { sections }
+  const uses = []
+  for (const i of items) uses.push(useOf(i, 'automation', 'in', 'runs', { label: `step ${i.step}` }))
+  for (const i of sections.find((x) => x.id === 'tables')?.items || []) {
+    const writes = i.key.startsWith('w:')
+    uses.push(useOf(i, 'de', writes ? 'out' : 'in', writes ? 'writes' : 'reads', { ent: /ENT/.test(i.badges?.[0]?.text || '') }))
+  }
+  const focus = { id: `focus:activity:${target.activityObjectId}`, type: activityMapType(target.typeId), label: target.name || 'Activity', sub: 'Activity · checked' }
+  return { sections, map: mapInput({ focus, sections, uses }) }
 }
 
 // ── One automation: what it touches ───────────────────────
@@ -395,7 +436,12 @@ async function analyseAutomation(target, ctx) {
     })), { source: events }))
   }
   sections.push(section('other', 'Other steps', other.map((o, i) => ({ key: `o${i}`, kind: 'Activity', title: o.text, badges: [], lines: [`Step ${o.step}`] })), { empty: 'None.' }))
-  return { sections, title: auto?.name }
+  for (const x of sections) for (const i of x.items) i.mapNote = /^Steps? [\d, ]+/.exec(i.lines?.[0] || '')?.[0]?.trim() || ''
+  const focus = { id: `focus:automation:${target.id}`, type: 'automation', label: auto?.name || target.name || 'Automation', sub: ['Automation', statusWords(auto?.status)].filter(Boolean).join(' · ') + ' · checked' }
+  const uses = usesBySection(sections, {
+    writes: ['de', 'out', 'writes'], reads: ['de', 'in', 'reads'], files: ['file', 'out', 'file'], emails: ['send', 'out', 'sends'], events: ['journey-event', 'out', 'entry'], other: ['step', 'out', 'runs'],
+  })
+  return { sections, title: auto?.name, map: mapInput({ focus, sections, uses }) }
 }
 
 // ── Journey entry event ───────────────────────────────────
@@ -410,7 +456,7 @@ async function analyseEvent(target, ctx) {
     // Its name (live test, 2026-11-07: the ID was shown); the ID when it can't be read.
     const auto = await sfmcFetch(`${AS(ctx.stack)}/automation/v1/automations/${encodeURIComponent(automationId)}`, 'GET').catch(() => null)
     sections.push(section('automation', 'Automation that fires it', [{
-      key: 'au', kind: 'Automation', title: auto?.name || `Automation ${automationId}`, badges: [],
+      key: 'au', kind: 'Automation', title: auto?.name || `Automation ${automationId}`, badges: auto?.status ? [{ text: auto.status, tone: 'status' }] : [], automationId,
       lines: auto?.name ? [`ID ${automationId}`] : ['Its name could not be read.'], route: `/automations/${encodeURIComponent(automationId)}`,
     }]))
   }
@@ -419,7 +465,8 @@ async function analyseEvent(target, ctx) {
     norm(t.metaData?.eventDefinitionKey || t.configurationArguments?.eventDefinitionKey) === norm(e.eventDefinitionKey) ||
     findValues(t, [e.id, e.eventDefinitionKey]).length)).map((j) => [j, []])
   sections.push(section('journeys', 'Journeys', journeyItems(items), { source: journeys }))
-  return { sections }
+  const focus = { id: `focus:event:${e.id}`, type: 'event', label: e.name || e.eventDefinitionKey, sub: 'Entry event · checked' }
+  return { sections, map: mapInput({ focus, sections, uses: usesBySection(sections, { source: ['de', 'in', 'entry'], automation: ['automation', 'in', 'runs'], journeys: ['journey', 'out', 'entry'] }) }) }
 }
 
 // ── Email ─────────────────────────────────────────────────
@@ -440,7 +487,12 @@ async function analyseEmail(target, ctx) {
     .map((s) => ({ key: `42:${s.activityObjectId}`, kind: 'Send Email activity', title: s.name || 'Send Email', badges: [], lines: [], activityObjectId: s.activityObjectId }))
   sections.push(section('sends', 'Send Email activities', sendItems, { source: sends }))
   await attachAutomations(ctx, sections)
-  return { sections, note: legacy == null ? 'This email has no legacy email ID, so journeys may not be matched.' : '' }
+  const focus = { id: `focus:asset:${a.id}`, type: 'content', label: a.name || 'Email', sub: 'Email · checked' }
+  return {
+    sections,
+    note: legacy == null ? 'This email has no legacy email ID, so journeys may not be matched.' : '',
+    map: mapInput({ focus, sections, uses: usesBySection(sections, { journeys: ['journey', 'out', 'sends'], sends: ['send', 'out', 'sends'] }) }),
+  }
 }
 
 // ── Content block ─────────────────────────────────────────
@@ -458,7 +510,9 @@ async function analyseBlock(target, ctx) {
   const sections = Object.keys(GROUP_TITLES).filter((g) => byGroup[g]).map((g) => section(g, GROUP_TITLES[g], byGroup[g]))
   if (!sections.length) sections.push(section('content', 'Emails, templates, content blocks and CloudPages', [], { source: assets }))
   if (sections[0] && assets?.capped) sections[0].note = 'Only the newest 5,000 items were checked.'
-  return { sections }
+  const focus = { id: `focus:asset:${b.id}`, type: 'content', label: b.name || 'Content block', sub: 'Content block · checked' }
+  const rules = Object.fromEntries([...Object.keys(GROUP_TITLES), 'content'].map((g) => [g, ['content', 'out', 'uses']]))
+  return { sections, map: mapInput({ focus, sections, uses: usesBySection(sections, rules) }) }
 }
 
 // ── File location ─────────────────────────────────────────
@@ -474,7 +528,8 @@ async function analyseLocation(target, ctx) {
       .map((f) => activityItem(ctx.stack, 53, f, { badges: [{ text: f.isUpload ? 'Upload' : 'Download', tone: 'info' }], lines: [f.fileSpec ? `File: ${f.fileSpec}` : ''].filter(Boolean) })), { source: transfers }),
   ]
   await attachAutomations(ctx, sections)
-  return { sections }
+  const focus = { id: `focus:location:${loc.id}`, type: 'location', label: loc.name || loc.id, sub: 'File location · checked' }
+  return { sections, map: mapInput({ focus, sections, uses: usesBySection(sections, { imports: ['import', 'out', 'file'], transfers: ['transfer', 'out', 'file'] }) }) }
 }
 
 // ── Profiles and send classifications ─────────────────────
@@ -516,7 +571,27 @@ async function analyseProfiles(target, ctx) {
     .map((g) => section(`p:${g.id}`, g.name ? `${g.name} (${g.id})` : g.id, g.items))
   if (!sections.length) sections.push(section('none', PROFILE_LABELS[target.profileType], [], { empty: 'None found in journeys or Send Email activities.' }))
   await attachAutomations(ctx, sections)
-  return { sections, note: 'Profiles are listed by the ID that journeys and Send Email activities store; SFMC gives no name for most of them here.' }
+  const real = sections.filter((x) => x.id.startsWith('p:'))
+  const hubs = real.map((x) => ({ id: x.id, type: 'profile', label: x.title, sub: PROFILE_LABELS[target.profileType].replace(/s$/, '') }))
+  const uses = real.flatMap((x) => x.items.map((i) => useOf(i, i.key.startsWith('j:') ? 'journey' : 'send', 'out', 'uses', { hub: x.id, label: '' })))
+  const focus = { id: `focus:profiles:${target.profileType}`, type: 'profile', label: PROFILE_LABELS[target.profileType], sub: 'Checked' }
+  return { sections, note: 'Profiles are listed by the ID that journeys and Send Email activities store; SFMC gives no name for most of them here.', map: mapInput({ focus, sections, uses, hubs }) }
+}
+
+// ── Map helpers ───────────────────────────────────────────
+/**
+ * Uses for the map, one per item, by section: rules is { sectionId: [type, dir, rel] }.
+ * The type 'journey-event' is an entry event (type event).
+ */
+function usesBySection(sections, rules) {
+  const uses = []
+  for (const x of sections) {
+    const r = rules[x.id]
+    if (!r) continue
+    const [type, dir, rel] = r
+    for (const i of x.items || []) uses.push(useOf(i, type === 'journey-event' ? 'event' : type, dir, rel))
+  }
+  return uses
 }
 
 // ── Registry ──────────────────────────────────────────────

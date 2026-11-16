@@ -116,6 +116,14 @@ Worker: `background/policy.js`; pages: `utils/policy.js` (`policy`, `isPolicyOn`
 
 - Suppression lists and SMS subscriptions (API ideas 16, 17; 2.0.23, not checked live): `utils/suppressionLists.js` (SOAP SuppressionListDefinition + SuppressionListContext, property lists with fallbacks via `retrieveWithFallbacks`), `utils/smsSubscriptions.js` (REST POST `sms/v1/contacts/subscriptions` on the jbinteractions host, assumed; refusal = note). The SMS call uses `sfmcFetchQuiet` (sfmcApi.js): body, answer and digit runs in errors stay out of the API console and recent calls.
 
+## Where used map (2.0.24, user 2026-11-16)
+
+- Every Where used result carries `result.map` (`mapInput()` in `utils/usage/graph.js`): the focus box, lineage edges in reach (data extensions only), the result items, and `uses` (how each item uses the focus: type, `in`/`out`, edge kind).
+- `buildUsageMap(input, { depth, expanded, automations })` gives nodes with a `level` relative to the focus and a `parent`; `layoutUsageMap()` (dagre LR, only forward edges with `minlen` = level gap, automations in a band above, loops back under the map) gives positions, paths and arrowheads; `usageMapSvg()` draws the same picture.
+- UI: `components/usage/UsageMap.vue` (vue-flow), `UsageMapNode.vue`, `UsageMapEdge.vue`; the result card is `UsageItemCard.vue` (list and map details). Settings in localStorage: `toolkit_usageView`, `toolkit_usageMapDepth`, `toolkit_usageMapAutomations`.
+- vue-flow: nodes that are neither selectable nor draggable get `pointer-events: none` unless `<VueFlow>` has node listeners, so the map forces it in CSS; it drops view changes made before its pane is ready, so the view is set on nodes initialised, pane ready and once more.
+- Design idea from VeLens for Marketing Cloud (no licence): no code taken.
+
 ## UI conventions
 
 - Never use browser `alert`/`confirm`: `await askConfirm({...})` (feedback #1050).

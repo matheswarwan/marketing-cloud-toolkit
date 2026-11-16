@@ -8,6 +8,18 @@
 
 export const TO_TEST = [
   {
+    version: '2.0.24',
+    status: 'In progress (branch where-used-map)',
+    items: [
+      {
+        id: '2.0.24-where-used-map', area: 'Data', title: 'Where used map', ref: 'user, 2026-11-16', from: 'Mathes', live: false,
+        where: 'Data > Where used, any check, Map above the results',
+        steps: ['Check a data extension that queries write and read; compare the map with the List.', 'Switch Levels 1, 2 and All; open a +N more box; turn the automations band off and on.', 'Hover and click boxes; open the SQL from the details; double-click a data extension, then an automation, then Back.', 'Open the key and pick a line kind; download PNG and SVG; download the results as HTML.', 'Check a field, an activity, an automation, an entry event, an email, a content block, a file location and sender profiles.', 'Fill the window, Escape; minimap; dark theme.'],
+        expect: 'Data flows left to right with the checked thing ringed; automations sit above the steps they run and their lines go round boxes; ENT. tables are dashed ghosts; the map opens readable (centred on the checked thing when it is too big to fit) after every check; the picture matches the map. Checked live on s10 Mathes Sandbox, 2026-11-16, for every kind.',
+      },
+    ],
+  },
+  {
     version: '2.0.23',
     status: 'On main, not packaged',
     items: [
