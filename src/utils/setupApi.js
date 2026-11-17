@@ -324,6 +324,20 @@ const PROFILE_CHECKED = ['ObjectID', 'CustomerKey', 'Name', 'FromName', 'FromAdd
 const PROFILE_PROPS = ['ObjectID', 'CustomerKey', 'Name', 'Description', 'FromName', 'FromAddress', 'UseDefaultRMMRules', 'AutoForwardToEmailAddress', 'AutoForwardToName',
   'DirectForward', 'AutoReply', 'SenderHeaderEmailAddress', 'SenderHeaderName', 'DataRetentionPeriodLength', 'CreatedDate', 'ModifiedDate']
 
+// Feedback #1077: every property accepted by a live Retrieve on s10 (2026-11-17; no rows
+// there, as the account has no private IP). ObjectID is refused for PrivateIP.
+const PRIVATE_IP_PROPS = ['ID', 'Name', 'IPAddress', 'IsActive', 'OrdinalID']
+
+export function privateIpRow(p) {
+  return { id: num(p.ID), name: p.Name || '', address: p.IPAddress || '', active: p.IsActive === 'true', order: num(p.OrdinalID) }
+}
+
+/** The account's private (dedicated) IP addresses for email sends, in SFMC's order. */
+export async function fetchPrivateIps(stack, { retrieve } = {}) {
+  const rows = await soapRetrieveAll(stack, 'PrivateIP', PRIVATE_IP_PROPS, opts(retrieve))
+  return rows.map(privateIpRow).sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.address.localeCompare(b.address))
+}
+
 /** SFMC's SendClassificationType as the UI names it: Marketing is Commercial, Operational is Transactional. */
 export function classificationTypeLabel(t) {
   if (/^marketing$/i.test(t || '')) return 'Commercial'
@@ -369,18 +383,19 @@ export const looksLikeMarketing = (name) => MARKETING_WORDS.test(String(name || 
 
 /**
  * Classifications, sender profiles and who uses each classification.
- * Returns { classifications[], profiles[], triggeredSends[], transactional[], notes[] }:
+ * Returns { classifications[], profiles[], triggeredSends[], transactional[], privateIps (null when unread), notes[] }:
  * each classification has `profile` (its sender profile row or null), `triggered` and
  * `transactional` (the sends using it) and `flags`. Triggered and transactional reads
  * are optional: a failure becomes a note, not an error.
  */
-export async function fetchSendSettings(stack, { retrieve, fetch, triggered = fetchTriggeredSends, tms = fetchTmsDefinitions } = {}) {
+export async function fetchSendSettings(stack, { retrieve, fetch, triggered = fetchTriggeredSends, tms = fetchTmsDefinitions, ips = fetchPrivateIps } = {}) {
   const notes = []
-  const [classes, profiles, tsds, tmsDefs] = await Promise.all([
+  const [classes, profiles, tsds, tmsDefs, privateIps] = await Promise.all([
     retrieveProps(stack, 'SendClassification', CLASS_PROPS, CLASS_CHECKED, opts(retrieve)),
     retrieveProps(stack, 'SenderProfile', PROFILE_PROPS, PROFILE_CHECKED, opts(retrieve)),
     triggered(stack, opts(retrieve)).catch((e) => { notes.push(`Triggered sends could not be read: ${e.message}`); return [] }),
     (fetch ? tms(stack, 'email', fetch) : tms(stack, 'email')).catch(() => { notes.push('Transactional email definitions could not be read; they are left out of Used by.'); return [] }),
+    ips(stack, opts(retrieve)).catch((e) => { notes.push(`The IP addresses could not be read: ${e.message}`); return null }),
   ])
   const profileRows = profiles.map(senderProfileRow)
   const byProfileKey = new Map(profileRows.map((p) => [p.key, p]))
@@ -406,6 +421,7 @@ export async function fetchSendSettings(stack, { retrieve, fetch, triggered = fe
     profiles: profileRows.map((p) => ({ ...p, flags: senderProfileFlags(p), classificationCount: used.get(p.key) || 0 })),
     triggeredSends: liveTsds,
     transactional,
+    privateIps,
     notes,
   }
 }

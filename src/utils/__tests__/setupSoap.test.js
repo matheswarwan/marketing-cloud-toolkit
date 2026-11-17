@@ -50,6 +50,10 @@ describe('Send settings', () => {
     const retrieve = async (r) => {
       if (r.objectType === 'SendClassification') return resp('<Results><ObjectID>c1</ObjectID><CustomerKey>Default Transactional</CustomerKey><Name>Default Transactional</Name><SendClassificationType>Operational</SendClassificationType><SenderProfile><CustomerKey>sp1</CustomerKey></SenderProfile><DeliveryProfile><CustomerKey>Default</CustomerKey></DeliveryProfile></Results><Results><CustomerKey>Default Commercial</CustomerKey><Name>Default Commercial</Name><SendClassificationType>Marketing</SendClassificationType><SenderProfile><CustomerKey>sp2</CustomerKey></SenderProfile></Results>')
       if (r.objectType === 'SenderProfile') return resp('<Results><ObjectID>p1</ObjectID><CustomerKey>sp1</CustomerKey><Name>Brand</Name><FromName>Brand</FromName><FromAddress>hello@brand.com</FromAddress></Results><Results><CustomerKey>sp2</CustomerKey><Name>Personal</Name><FromAddress>me@yahoo.com</FromAddress></Results>')
+      if (r.objectType === 'PrivateIP') {
+        expect(r.properties).toEqual(['ID', 'Name', 'IPAddress', 'IsActive', 'OrdinalID'])
+        return resp('<Results><ID>2</ID><Name>Backup</Name><IPAddress>13.111.0.2</IPAddress><IsActive>false</IsActive><OrdinalID>2</OrdinalID></Results><Results><ID>1</ID><Name>Main</Name><IPAddress>13.111.0.1</IPAddress><IsActive>true</IsActive><OrdinalID>1</OrdinalID></Results>')
+      }
       throw new Error('unexpected ' + r.objectType)
     }
     const triggered = async () => [
@@ -67,6 +71,10 @@ describe('Send settings', () => {
     expect(com.flags).toEqual([])
     expect(s.profiles.find((p) => p.key === 'sp2').flags).toEqual(['Free mail domain (yahoo.com)'])
     expect(s.profiles.find((p) => p.key === 'sp1').classificationCount).toBe(1)
+    expect(s.privateIps).toEqual([
+      { id: 1, name: 'Main', address: '13.111.0.1', active: true, order: 1 },
+      { id: 2, name: 'Backup', address: '13.111.0.2', active: false, order: 2 },
+    ])
     expect(s.notes).toEqual([])
   })
 
@@ -74,7 +82,16 @@ describe('Send settings', () => {
     const retrieve = async () => resp('')
     const s = await fetchSendSettings('s10', { retrieve, triggered: async () => { throw new Error('nope') }, tms: async () => { throw new Error('x') }, fetch: () => {} })
     expect(s.classifications).toEqual([])
+    expect(s.privateIps).toEqual([])
     expect(s.notes.length).toBe(2)
+  })
+
+  // Feedback #1077: an unreadable IP list is a note, not a failure of the page.
+  it('notes IP addresses it could not read', async () => {
+    const retrieve = async (r) => (r.objectType === 'PrivateIP' ? resp('', 'Error: not allowed') : resp(''))
+    const s = await fetchSendSettings('s10', { retrieve, triggered: async () => [], tms: async () => [], fetch: () => {} })
+    expect(s.privateIps).toBeNull()
+    expect(s.notes.join(' ')).toMatch(/IP addresses could not be read/)
   })
 })
 

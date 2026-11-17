@@ -5,6 +5,8 @@
 // classification. Gentle "to review" hints: a Transactional classification used by a send
 // whose name reads like marketing, and sender profiles with no From address or a free mail
 // domain. SOAP SendClassification, SenderProfile, TriggeredSendDefinition. Read-only.
+// IP addresses (feedback #1077): SOAP PrivateIP. Delivery profiles have no Retrieve in
+// SFMC's SOAP API (checked live), so only their keys show, on the classifications.
 import { computed, ref } from 'vue'
 import { Loader2, RefreshCw, ChevronDown, ChevronRight } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
@@ -71,6 +73,11 @@ const profileColumns = [
   { key: 'autoForwardAddress', label: 'Auto forward to', hidden: true }, { key: 'key', label: 'External key', hidden: true }, { key: 'description', label: 'Description', hidden: true },
   { key: 'modified', label: 'Modified', hidden: true, sortValue: (r) => r.modifiedDate }, { key: 'created', label: 'Created', hidden: true, sortValue: (r) => r.createdDate },
 ]
+const ipRows = computed(() => (data.value?.privateIps || []).map((p) => ({ ...p, key: String(p.id ?? p.address), activeText: p.active ? 'Yes' : 'No' })))
+const ipColumns = [
+  { key: 'address', label: 'IP address' }, { key: 'name', label: 'Name' }, { key: 'activeText', label: 'Active' },
+  { key: 'order', label: 'Order', hidden: true }, { key: 'id', label: 'ID', hidden: true },
+]
 const table = (title, cols, rows) => [{ type: 'h', text: title }, { type: 'table', columns: cols.map((c) => c.label), rows: rows.map((r) => cols.map((c) => String(r[c.key] ?? ''))) }]
 const getDoc = () => {
   const used = classRows.value.flatMap((c) => [...c.triggered.map((t) => [c.name, 'Triggered send', t.name, t.key, t.status]), ...c.transactional.map((t) => [c.name, 'Transactional', t.name, t.key, t.status])])
@@ -79,6 +86,7 @@ const getDoc = () => {
     blocks: [
       ...table('Send classifications', classColumns, classRows.value),
       ...table('Sender profiles', profileColumns, profileRows.value),
+      ...(data.value?.privateIps ? table('IP addresses', ipColumns, ipRows.value) : []),
       { type: 'h', text: 'Used by' }, { type: 'table', columns: ['Classification', 'Kind', 'Send', 'External key', 'Status'], rows: used },
     ],
   }
@@ -127,7 +135,12 @@ const getDoc = () => {
         <DataTable :columns="profileColumns" :rows="profileRows" storage-key="sender-profiles" empty-text="No sender profiles to show.">
           <template #cell-flagsText="{ row }"><span class="text-amber-700 dark:text-amber-400">{{ row.flagsText }}</span></template>
         </DataTable>
-        <p class="px-3 py-2 text-xs text-muted-foreground border-t border-border">Delivery profiles cannot be read through the API, so only their keys are shown on the classifications.</p>
+      </section>
+      <section class="rounded-lg border border-border bg-card" data-send-settings-ips>
+        <h2 class="px-3 py-2 border-b border-border text-sm font-semibold">IP addresses</h2>
+        <p v-if="data.privateIps && !data.privateIps.length" class="px-3 py-2 text-sm" data-send-settings-no-ips>SFMC lists no private (dedicated) IP addresses for this account. Without one, its email goes out on Salesforce's shared IP addresses.</p>
+        <DataTable v-else-if="data.privateIps" :columns="ipColumns" :rows="ipRows" row-key="key" storage-key="private-ips" empty-text="No IP addresses to show." />
+        <p class="px-3 py-2 text-xs text-muted-foreground border-t border-border">The private IP addresses SFMC has for this account's email sends. Which IP and domain each delivery profile uses cannot be read: SFMC's API has no way to read delivery profiles, so only their keys show on the classifications. Sending domains are on Setup &gt; Domains.</p>
       </section>
     </template>
   </div>
