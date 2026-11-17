@@ -10,7 +10,7 @@
 // Which fields link two sets (relationshipAttributes or similar) is read defensively: the
 // field names are guesses. All REST through the Journey Builder host's /fuelapi.
 import * as dagre from '@dagrejs/dagre'
-import { sfmcFetch } from './sfmcApi.js'
+import { sfmcFetch, searchDEsAllSources } from './sfmcApi.js'
 import { htmlEscape } from './exportDoc.js'
 
 const API = (stack) => `https://jbinteractions.${stack}.marketingcloudapps.com/fuelapi/contacts/v1`
@@ -81,6 +81,25 @@ function attributeNames(set) {
   return m
 }
 
+/**
+ * One attribute (field) of a set: shape checked live on s10, 2026-11-17 (attributes[]
+ * with name { value }, storageName (the data extension column), dataType, length,
+ * isPrimaryKey, isNullable, displayOrder, isHidden).
+ */
+export function toField(a) {
+  return {
+    id: String(a?.id ?? a?.definitionID ?? a?.valueDefinitionID ?? ''),
+    name: textOf(a?.name ?? a?.definitionName ?? a?.key),
+    column: textOf(a?.storageName ?? a?.key ?? '') || textOf(a?.name ?? a?.key),
+    type: textOf(a?.dataType ?? ''),
+    length: a?.length > 0 ? Number(a.length) : null,
+    pk: !!a?.isPrimaryKey,
+    nullable: a?.isNullable !== false,
+    hidden: !!a?.isHidden,
+    order: Number(a?.displayOrder ?? 0),
+  }
+}
+
 export function toAttributeSet(s) {
   const fields = [...(s?.attributes || []), ...(s?.valueDefinitions || [])]
   return {
@@ -96,6 +115,7 @@ export function toAttributeSet(s) {
     event: !!s?.isEvent,
     categoryId: s?.categoryID ?? null,
     fieldCount: fields.length || null,
+    fields: fields.map(toField).filter((f) => f.id || f.name).sort((a, b) => (b.pk - a.pk) || (a.order - b.order)),
   }
 }
 
@@ -106,7 +126,9 @@ function linkFields(r, names) {
   return (Array.isArray(list) ? list : []).map((p) => {
     const left = name(p?.leftAttributeID ?? p?.leftItem?.identifier, p?.leftAttributeName ?? p?.leftItem?.name ?? p?.leftAttribute?.name)
     const right = name(p?.rightAttributeID ?? p?.rightItem?.identifier, p?.rightAttributeName ?? p?.rightItem?.name ?? p?.rightAttribute?.name)
-    return left || right ? { left, right } : null
+    const leftId = idOf(p?.leftAttributeID ?? p?.leftItem?.identifier)
+    const rightId = idOf(p?.rightAttributeID ?? p?.rightItem?.identifier)
+    return left || right ? { left, right, leftId, rightId } : null
   }).filter(Boolean)
 }
 
@@ -179,7 +201,10 @@ export function buildModel(rawSets, rawGroups = []) {
     }
   }
   const describe = (r) => ({ ...r, leftName: nameOf(r.left), rightName: nameOf(r.right), cardinality: cardinalityText(r.left.cardinality, r.right.cardinality) })
-  const list = [...groups.values()].map((g) => ({ ...g, links: g.links.map(describe) })).sort((a, b) => a.name.localeCompare(b.name))
+  const list = [...groups.values()].map((g) => ({
+    ...g, links: g.links.map(describe), // Visible attributes, as Data Designer counts them (System Data on s10: 4 of 7, 2026-11-17).
+    attributeCount: g.sets.reduce((n, s) => n + s.fields.filter((f) => !f.hidden).length, 0),
+  })).sort((a, b) => a.name.localeCompare(b.name))
   const unplaced = sets.filter((s) => !placed.has(idOf(s.id))).sort((a, b) => a.name.localeCompare(b.name))
   return { groups: list, unplaced, sets, relationships: relationships.map(describe) }
 }
@@ -261,3 +286,23 @@ export async function fetchDataModel(stack, fetch = sfmcFetch) {
   const rawSets = await fetchAttributeSets(stack, fetch)
   return { schema, groupSource: source, ...buildModel(rawSets, groups) }
 }
+
+/**
+ * The data extension behind an attribute set, for Preview data, Run Query and Where used:
+ * { id, customerKey, name, sourceType } or null. Matched by key, else by exact name (a
+ * set's key and name are its data extension's, checked live on s10, 2026-11-17).
+ * SFMC's own sets (MobileConnect, MobilePush, Predictive Intelligence) have none.
+ */
+export async function findSetDataExtension(stack, set, search = searchDEsAllSources) {
+  if (!set?.name) return null
+  const items = (await search(stack, set.name, 25))?.items || []
+  const low = (v) => String(v ?? '').toLowerCase()
+  const key = (d) => d.customerKey ?? d.key
+  const de = (set.key && items.find((d) => low(key(d)) === low(set.key))) || items.find((d) => low(d.name) === low(set.name))
+  if (!de) return null
+  const sourceType = de.sourceType === 'shared' ? 'shared' : de.sourceType === 'sync' ? 'synchronized' : null
+  return { id: String(de.id ?? ''), customerKey: String(key(de) ?? ''), name: String(de.name ?? ''), sourceType }
+}
+
+/** A data extension's name as SQL reaches it: a Shared one through ENT. (as deSql.js, feedback #73). */
+export const deSqlName = (de) => (de.sourceType === 'shared' ? `ENT.${de.name}` : de.name)

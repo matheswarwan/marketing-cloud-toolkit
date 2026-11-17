@@ -80,3 +80,14 @@ export function getStackChoices() {
 export function setStackOverride(stack) {
   return ask({ type: 'SET_STACK_OVERRIDE', stack: stack || null })
 }
+
+/**
+ * The error a page shows when it has no SFMC stack yet (no logged-in SFMC tab found).
+ * A connection error (code SFMC_LOGIN_REQUIRED), so pages show it as one; useStack keeps
+ * looking and whenStack loads the page again once a stack is found.
+ */
+export function noStackError() {
+  const e = new Error('No logged-in Marketing Cloud tab found. Log in to SFMC in any tab; this page loads by itself once you do.')
+  e.code = 'SFMC_LOGIN_REQUIRED'
+  return e
+}

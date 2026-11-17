@@ -2,6 +2,7 @@
 // trial; public/dashboardPanel.js). Reads every automation and journey of the
 // current business unit, like the overview pages, and sends back a small summary.
 // Kept for 10 minutes per stack and business unit unless the card asks for a refresh.
+import { legacyRows } from '../utils/automationPaging.js'
 import { sfmcFetch } from './fetchProxy.js'
 import { storageGet } from './chromeAsync.js'
 import { summarizeAutomations, summarizeJourneys } from '../utils/summaries.js'
@@ -26,9 +27,12 @@ async function currentBU(stack) {
   }
 }
 
-async function automationPage(stack, skip, top) {
-  const d = await sfmcFetch({ url: `${AS(stack)}/legacy/v1/beta/automations/automation/definition/?$top=${top}&$skip=${skip}&$sort=${encodeURIComponent('lastRunTime desc')}&view=gridView` })
-  return { entries: d?.entry || [], total: d?.totalResults ?? (d?.entry || []).length }
+// `skip` counts rows; the list wants a page number (feedback #1100, utils/automationPaging.js).
+function automationPage(stack, skip, top) {
+  return legacyRows(skip, top, async (page) => {
+    const d = await sfmcFetch({ url: `${AS(stack)}/legacy/v1/beta/automations/automation/definition/?${page}&$sort=${encodeURIComponent('lastRunTime desc')}&view=gridView` })
+    return { entries: d?.entry || [], total: d?.totalResults ?? (d?.entry || []).length }
+  })
 }
 
 /** Every automation (up to 2,000), 50 at a time, as the overview reads them (feedback #28's fallback included). */
@@ -46,7 +50,7 @@ export async function listAutomations(stack) {
     }
     if (!fresh.length) break
     fresh.forEach((a) => { seen.add(a.id); items.push(a) })
-    total = r.total
+    if (r.entries.length) total = r.total
   }
   return items
 }

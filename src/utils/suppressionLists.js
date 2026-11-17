@@ -45,6 +45,17 @@ export function suppressionListRow(d) {
   }
 }
 
+/**
+ * Preview data for a list's addresses. A suppression list is stored as a data extension:
+ * the customobjectdata rowset by the list's CustomerKey answers with customObjectId equal to
+ * the list's ObjectID and its rows (Email Address, Date Added), checked live on s10,
+ * 2026-11-17 (user asked to open, search and export a list). Null without a key.
+ */
+export function suppressionPreviewTo(list) {
+  if (!list?.key) return null
+  return { path: '/data-extensions/preview', query: { id: list.id || '', key: list.key, name: list.name || list.key } }
+}
+
 export function suppressionContextRow(c) {
   return {
     id: c.ObjectID || '', context: c.Context || '',

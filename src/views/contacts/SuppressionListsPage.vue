@@ -2,8 +2,9 @@
 // Contacts > Suppression lists (API idea 16, user 2026-11-11): every suppression list with
 // its subscriber count and where it applies (enterprise, business unit, send classification,
 // sender profile, publication or one send). SOAP SuppressionListDefinition and
-// SuppressionListContext (utils/suppressionLists.js). Whether one address is on a list is
-// not offered: there is no documented read for it. Read-only: nothing is changed in SFMC.
+// SuppressionListContext (utils/suppressionLists.js). A list's addresses open in Preview
+// data (search, filters, downloads): a suppression list is stored as a data extension
+// (suppressionPreviewTo, checked live 2026-11-17). Read-only: nothing is changed in SFMC.
 import { computed, ref } from 'vue'
 import { Loader2, RefreshCw, Info } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
@@ -12,7 +13,7 @@ import DataTable from '@/components/results/DataTable.vue'
 import DownloadMenu from '@/components/results/DownloadMenu.vue'
 import { useStack, whenStack } from '@/composables/useStack.js'
 import { searchError } from '@/utils/sfmcErrors.js'
-import { fetchSuppressionLists, suppressionSummary } from '@/utils/suppressionLists.js'
+import { fetchSuppressionLists, suppressionSummary, suppressionPreviewTo } from '@/utils/suppressionLists.js'
 import { formatDateTime } from '@/utils/format.js'
 
 const { stack } = useStack()
@@ -79,6 +80,10 @@ function getDoc() {
       <p v-for="n in data.notes" :key="n" class="text-xs text-amber-700 dark:text-amber-400">{{ n }}</p>
       <section class="rounded-lg border border-border bg-card">
         <DataTable :columns="columns" :rows="rows" storage-key="suppression-lists" empty-text="No suppression lists in this business unit.">
+          <template #cell-name="{ row }">
+            <RouterLink v-if="suppressionPreviewTo(row)" :to="suppressionPreviewTo(row)" class="text-primary hover:underline" data-suppression-open>{{ row.name }}</RouterLink>
+            <span v-else>{{ row.name }}</span>
+          </template>
           <template #cell-appliesText="{ row }">
             <ul v-if="row.contexts.length" class="text-xs space-y-0.5">
               <li v-for="c in row.contexts" :key="c.id || c.label"><span class="text-muted-foreground">{{ c.kind }}:</span> {{ c.label }}</li>
@@ -87,7 +92,7 @@ function getDoc() {
           </template>
         </DataTable>
       </section>
-      <p class="flex items-start gap-1.5 text-xs text-muted-foreground"><Info class="h-3.5 w-3.5 mt-0.5 shrink-0" /> Whether one address is on a list is not shown here: SFMC has no documented way to read that. Open the list in Email Studio or Contact Builder to search it. A list that is not set to apply anywhere still suppresses a send that picks it when the send is set up.</p>
+      <p class="flex items-start gap-1.5 text-xs text-muted-foreground"><Info class="h-3.5 w-3.5 mt-0.5 shrink-0" /> Click a list's name to see its addresses, search them and download them (Preview data). A list that is not set to apply anywhere still suppresses a send that picks it when the send is set up.</p>
     </template>
   </div>
 </template>

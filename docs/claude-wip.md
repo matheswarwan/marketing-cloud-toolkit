@@ -1,5 +1,22 @@
 # Work in progress
 
+## Errors in new features, suppression list contents, data model diagram (2026-11-17, same branch, not committed)
+
+- User: "most of the latest released features have errors". Swept 25 pages from 2.0.23 and 2.0.24 live on s10. Cause found: a Toolkit tab opened before logging in (or left open past the session) never learned the stack, so every SOAP page said "Unknown stack" (Business units showed 0) until reloaded. Fixed in `useStack` (retry every 5 s and on focus, `whenStack` runs again), with `noStackError()` instead of "Unknown stack". Checked live with the session lookup blocked, then unblocked: the page loaded by itself. With a fresh session all 25 pages load; Sends Details, email Checks, Send problems, Data model, Recycle bin, Import results used live.
+- Feedback #1103 (2.0.24): "Could not read the sends: Failed to fetch": same cause as #1102 (SOAP host), fixed on this branch.
+- Suppression lists: each list opens its addresses in Preview data (a list is a data extension, checked live).
+- Data model: new Diagram (see claude-context, Data model diagram). Checked live on s10: counts match Data Designer, cards, links, panel, View contents, Query this set, search, Back, dark mode.
+- Not yet tried by hand from 2.0.24: Starter queries into Run Query, journey Email results, Subscriber lookup in every BU, Ctrl+K, Dark/Images off/Mobile previews. Contact deletions shows raw JSON (field names unconfirmed): map them from the live answer.
+- Next: user review, then commit (asked to commit only when told) and the PR; then #1077 (IP addresses and sender settings).
+
+
+## Feedback #1100 and #1102 (2026-11-16, branch `fix-feedback-1100-1102`)
+
+- #1100, automations stop at 100: Automation Studio's legacy list reads `$skip` as a page number (live on s10, 452 automations: `$top=50&$skip=2` gives rows 100-149; `$skip=50` gives no rows and `totalResults: 0`). The Toolkit sent row offsets, and Load more took the total from the empty answer (0), which hid the button. Fixed in `utils/automationPaging.js` (rows to pages), `automationApi.js` (search, folder forms, change reads, Load more total) and `background/dashboard.js`. Checked live: Load more goes 50, 100, ..., 450, 452 and then stops.
+- #1102, Users and roles "Failed to fetch" on s13: `webservice.s13.exacttarget.com` does not exist (no DNS for s11, s12, s13, s50 or s51). `background/soap.js` now sends SOAP to the `soap` entry of the account's `platform/v1/endpoints` list (accepted hosts: `<tenant>.soap.marketingcloudapis.com`, `webservice.sN.exacttarget.com`), with `webservice.<stack>` as the fallback. New required host permission `https://*.soap.marketingcloudapis.com/*` (user's choice; Chrome asks current users to accept it on update) plus CSP and security baseline. Checked live on s10 (its list names webservice.s10; Users loads).
+- Not checked live: that the tenant SOAP host accepts the MCA session token as `<fueloauth>`, and what the endpoint list says on s11+. Needs the tenant subdomain of an account (Setup > Installed Packages > API integration > SOAP Base URI) or a login on an s11+ stack.
+- Next: the author reviews and writes the CHANGELOG section; then PR, version bump and release. Mark #1100 and #1102 fixed in D1 after release.
+
 ## Release 2.0.24 (2026-11-16): waiting on the author
 
 - PR #14 (`release-2.0.24` into main) holds PR #13 (Where used map), `velens-ideas` (8 features), the version bump and `releases/sfmc-toolkit-2.0.24.zip` (built from efd04a0 with `package.mjs --ci`, SHA-256 e9dab0b55ff93c3964bbe5648f2dfa9cf38d23fee0ce0a696e6ae3cea4071fcc).

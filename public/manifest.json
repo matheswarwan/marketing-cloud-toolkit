@@ -35,13 +35,14 @@
     "https://*.marketingcloudapps.com/*",
     "https://*.marketingcloud.com/*",
     "https://*.salesforce-marketingcloud.com/*",
-    "https://*.herokuapp.com/*"
+    "https://*.herokuapp.com/*",
+    "https://*.soap.marketingcloudapis.com/*"
   ],
   "storage": {
     "managed_schema": "managed_schema.json"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://*.exacttarget.com https://*.marketingcloudapps.com https://*.marketingcloud.com https://*.salesforce-marketingcloud.com https://sfmc-share-worker.mathes-btech.workers.dev https://query-saver-feedback.mathes-btech.workers.dev https://cloudflare-dns.com data: blob:"
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://*.exacttarget.com https://*.marketingcloudapps.com https://*.marketingcloud.com https://*.salesforce-marketingcloud.com https://*.soap.marketingcloudapis.com https://sfmc-share-worker.mathes-btech.workers.dev https://query-saver-feedback.mathes-btech.workers.dev https://cloudflare-dns.com data: blob:"
   },
   "content_scripts": [
     {

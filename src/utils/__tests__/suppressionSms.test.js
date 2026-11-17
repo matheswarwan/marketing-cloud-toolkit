@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   fetchSuppressionLists, suppressionListRow, suppressionContextRow, describeContext, joinContexts, suppressionSummary, retrieveWithFallbacks, DEFINITION_PROPS,
+  suppressionPreviewTo,
 } from '../suppressionLists.js'
 import {
   normalizeMobile, parseLookupInput, lookupBody, smsSubscriptionRow, subscriptionsFrom, notInAnswer, statusWords, isSmsRefused, lookupSmsSubscriptions, maskDigits, SMS_LOOKUP_LIMIT,
@@ -10,6 +11,12 @@ import { retrieveEnvelope } from '../../background/soap.js'
 const resp = (results, status = 'OK') => `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI"><OverallStatus>${status}</OverallStatus><RequestID>r1</RequestID>${results}</RetrieveResponseMsg></soap:Body></soap:Envelope>`
 
 describe('Suppression lists (API idea 16)', () => {
+  it('opens a list in Preview data by its key (a suppression list is a data extension)', () => {
+    expect(suppressionPreviewTo({ id: '0a3b-1', key: 'SendGridAutoSuppression', name: 'SendGrid Auto Suppression' }))
+      .toEqual({ path: '/data-extensions/preview', query: { id: '0a3b-1', key: 'SendGridAutoSuppression', name: 'SendGrid Auto Suppression' } })
+    expect(suppressionPreviewTo({ id: 'x', key: '', name: 'No key' })).toBe(null)
+  })
+
   it('turns definitions and contexts into rows', () => {
     expect(suppressionListRow({ ObjectID: 'A', ID: '5', CustomerKey: 'k', Name: 'Competitors', SubscriberCount: '42', CreatedDate: '0001-01-01T00:00:00', Client: { ID: '100' } }))
       .toMatchObject({ id: 'A', numericId: 5, key: 'k', name: 'Competitors', count: 42, createdDate: '', mid: 100 })

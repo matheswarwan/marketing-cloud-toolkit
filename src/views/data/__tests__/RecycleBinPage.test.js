@@ -40,12 +40,42 @@ describe('Recycle bin page', () => {
 describe('Data model page', () => {
   it('lists each group with its attribute sets and relationships', async () => {
     const { default: Page } = await import('../../contacts/DataModelPage.vue')
+    localStorage.removeItem('toolkit_dataModelView')
     const w = mount(Page)
     await flushPromises()
-    expect(w.text()).toContain('Main group')
+    // Opens on the diagram: the groups around Contacts, as Data Designer does.
+    expect(w.find('[data-dm-overview]').exists()).toBe(true)
+    expect(w.find('[data-dm-group="G1"]').text()).toContain('Main group')
+    await w.find('[data-view="list"]').trigger('click')
     expect(w.text()).toContain('Members')
     expect(w.text()).toContain('Linked to Main group, many-to-one')
-    await w.find('[data-view="diagram"]').trigger('click')
-    expect(w.find('svg').exists()).toBe(true)
+    expect(localStorage.getItem('toolkit_dataModelView')).toBe('list')
+  }, 30000)
+
+  it('opens the group and set named in the address (Back from Preview data returns there)', async () => {
+    localStorage.setItem('toolkit_dataModelView', 'diagram')
+    route.query = { group: 'g1', set: 's1' }
+    const { default: Page } = await import('../../contacts/DataModelPage.vue')
+    const w = mount(Page, { global: { stubs: { DataModelMap: true } } })
+    await flushPromises()
+    expect(w.find('[data-dm-back]').exists()).toBe(true)
+    expect(w.find('[data-dm-panel]').text()).toContain('Members')
+    route.query = {}
+  }, 30000)
+
+  it('finds a set by name and opens its details', async () => {
+    localStorage.setItem('toolkit_dataModelView', 'diagram')
+    const { default: Page } = await import('../../contacts/DataModelPage.vue')
+    // The map itself is tested in components/dataModel (it needs vue-flow).
+    const w = mount(Page, { global: { stubs: { DataModelMap: true } } })
+    await flushPromises()
+    await w.find('[data-dm-search]').setValue('memb')
+    const hit = w.find('[data-dm-results] button')
+    expect(hit.text()).toContain('Members')
+    await hit.trigger('click')
+    await flushPromises()
+    expect(w.find('[data-dm-back]').exists()).toBe(true)
+    expect(w.find('[data-dm-panel]').text()).toContain('Members')
+    expect(w.find('[data-dm-panel]').text()).toContain('Main group')
   }, 30000)
 })
