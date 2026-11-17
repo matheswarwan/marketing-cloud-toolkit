@@ -17,11 +17,13 @@
 import { resolveUrl } from './apps.js'
 import { getCoreCsrf, getAppCsrf, rememberCsrf } from './csrf.js'
 import { jbCsrfFor, captureJbCsrf, dropJbCsrf } from './jbCsrf.js'
-import { getMcaToken, dropMcaToken } from './mcaToken.js'
+import { getMcaToken, renewMcaToken } from './mcaToken.js'
 import { ensureSession, SfmcAuthError, LOGIN_REQUIRED, SESSION_UNAVAILABLE } from './sessions.js'
 import { forgetStack } from './stack.js'
 import { needsPageHeaders, pageHeadersFor, capturePageHeaders, dropPageHeaders } from './pageHeaders.js'
 import { coreOrigin } from '../utils/sfmcHosts.js'
+import { ensureAppInCurrentUnit } from './appBu.js'
+import { fetchCurrentBusinessUnit } from './businessUnit.js'
 
 /**
  * SFMC's own HTML error pages (IIS "403 Not Authorized") turned into their title,
@@ -119,9 +121,24 @@ export async function sfmcFetch(request) {
   }
 }
 
+// The unit an app answers for (its tokenContext), or null when it has no session.
+async function appMid(app, stack) {
+  const url = app.tokenContextUrl(stack)
+  const res = await send(url, 'GET', null, await authHeaders({ url, ...resolveUrl(url), mutating: false }))
+  if (!res.ok || res.webPage) return null
+  try { return Number(JSON.parse(res.body)?.organization?.id) || null } catch { return null }
+}
+const currentMid = async (stack) => Number((await fetchCurrentBusinessUnit(stack))?.accountId) || null
+
 async function fetchWithSession({ url, method = 'GET', body = null, bootstrap = true }) {
   const target = { url, ...resolveUrl(url), mutating: method !== 'GET' && method !== 'HEAD' }
   const { stack, family, app } = target
+
+  // Content Builder and Journey Builder stay in the unit they signed in to: move them to
+  // SFMC's current unit first, or the call reads another unit's data (appBu.js).
+  if (family === 'mca' && app?.followsBusinessUnit === false && app.tokenContextUrl) {
+    await ensureAppInCurrentUnit(app, stack, { currentMid, appMid })
+  }
 
   let headers = await authHeaders(target)
   let res = await send(url, method, body, headers)
@@ -139,7 +156,8 @@ async function fetchWithSession({ url, method = 'GET', body = null, bootstrap = 
   }
 
   if (needsSession(res) && app?.bearer && headers.Authorization) {
-    dropMcaToken(stack)
+    // Renewed, not just asked for again (feedback #1104: the same dead token comes back).
+    await renewMcaToken(stack)
     headers = await authHeaders(target)
     if (headers.Authorization) res = await send(url, method, body, headers)
   }

@@ -69,6 +69,7 @@ function response(status, body, { type = 'basic', headers = {} } = {}) {
  * @param {object} [o.local], [o.session]  initial chrome.storage areas
  * @param {object|null} [o.currentBU]
  * @param {boolean} [o.loginPageWhenNoSession]  apps answer 200 with their login page instead of 401
+ * @param {boolean} [o.mintGoesToLogin]  a token tab on a stack that is not mintable lands on the login page
  */
 export async function loadSW(o = {}) {
   const sim = {
@@ -114,6 +115,15 @@ export async function loadSW(o = {}) {
             const token = `jwt-${stack}-${++sim.tokenCount}`
             sim.tokens.add(token)
             setTimeout(() => onMessage.fns.forEach((fn) => fn({ type: 'MCA_TOKEN_CAPTURED', accessToken: token }, { tab: { id } }, () => {})), 0)
+          } else if (opts.url.includes('/update-token.json') && o.mintGoesToLogin) {
+            const login = 'https://mc.login.exacttarget.com/hub-cas/login?service=x'
+            setTimeout(() => chrome.tabs.onUpdated.fns.forEach((fn) => fn(id, { url: login }, { id, url: login, active: false })), 0)
+          }
+          if (opts.url.includes('/AutomationStudioFuel3/?hub=1&ks=ks')) {
+            // The app's start page: signs in again when logged in, else ends on the login page.
+            const url = sim.loggedIn.has(stack) ? `https://mc.${stack}.marketingcloudapps.com/AutomationStudioFuel3/` : 'https://mc.login.exacttarget.com/hub-cas/login'
+            if (sim.loggedIn.has(stack)) sim.mintable.add(stack)
+            setTimeout(() => chrome.tabs.onUpdated.fns.forEach((fn) => fn(id, { status: 'complete' }, { id, url, active: false })), 0)
           }
           const appId = sim.landings[opts.url]
           if (appId) sim.sessions.add(`${stack}:${appId}`)
@@ -201,7 +211,7 @@ export async function loadSW(o = {}) {
     }
   }
 
-  return { sim, send, captureQuery, local: local.data, session: session.data, onBeforeRequest, onBeforeSendHeaders }
+  return { sim, send, captureQuery, local: local.data, session: session.data, onBeforeRequest, onBeforeSendHeaders, onUpdated: chrome.tabs.onUpdated }
 }
 
 export const flush = (ms = 60) => new Promise((r) => setTimeout(r, ms))

@@ -164,6 +164,65 @@ describe('connection status', () => {
     await flush(450)
     expect(mints()).toBe(1)
   })
+
+  // Feedback #1104: no session sends the token tab to the login page; fail then, not at the timeout.
+  it('a token tab that lands on the login page fails at once', async () => {
+    const sw = await loadSW({ loggedIn: ['s13'], local: { sfmcStack: 's13', sfmcStackTs: 1 }, mintGoesToLogin: true })
+    await sw.send({ type: 'GET_CONNECTION_STATUS' })
+    await flush(120) // well before the 300 ms timeout
+    expect(sw.local.sfmcStack).toBeUndefined()
+    expect(sw.sim.removed.length).toBe(1)
+  })
+
+  // Feedback #1104: after logging in again, the token is asked for again at once.
+  it('a logged-in SFMC page ends the pause after a failed mint', async () => {
+    const sw = await loadSW({ loggedIn: ['s13'], local: { sfmcStack: 's13', sfmcStackTs: 1 } })
+    await sw.send({ type: 'GET_CONNECTION_STATUS' })
+    await flush(450)
+    const mints = () => sw.sim.created.filter((t) => t.url.includes('mc.s13.marketingcloudapps.com')).length
+    expect(mints()).toBe(1)
+
+    sw.sim.mintable.add('s13')
+    const page = { id: 7, active: false, url: 'https://mc.s13.exacttarget.com/cloud/' }
+    sw.onUpdated.fns.forEach((fn) => fn(7, { status: 'complete' }, page))
+    await sw.send({ type: 'GET_CONNECTION_STATUS' })
+    await flush()
+    expect(mints()).toBe(2)
+    expect((await sw.send({ type: 'GET_CONNECTION_STATUS' })).mcaTokenReady).toBe(true)
+  })
+
+  // Feedback #1104 follow-up: after a new login the token address hands out a dead token;
+  // renewing loads Automation Studio's start page (which signs in again), then mints.
+  it('renews a refused token through the app start page', async () => {
+    const sw = await loadSW({ tabs: [s10Tab], loggedIn: ['s10'] })
+    const { renewMcaToken } = await import('../mcaToken.js')
+    const token = await renewMcaToken('s10')
+    expect(token).toMatch(/^jwt-s10-/)
+    expect(sw.sim.created.map((t) => t.url)).toEqual([
+      'https://mc.s10.marketingcloudapps.com/AutomationStudioFuel3/?hub=1&ks=ks',
+      'https://mc.s10.marketingcloudapps.com/AutomationStudioFuel3/update-token.json',
+    ])
+    expect(sw.sim.created.every((t) => t.active === false)).toBe(true)
+  })
+
+  it('gives no token when the app start page ends on the login page', async () => {
+    const sw = await loadSW({ tabs: [s10Tab] })
+    const { renewMcaToken } = await import('../mcaToken.js')
+    expect(await renewMcaToken('s10')).toBeNull()
+    expect(sw.sim.created).toHaveLength(1)
+    expect(sw.sim.removed).toHaveLength(1)
+  })
+
+  it('the login page itself does not end the pause', async () => {
+    const sw = await loadSW({ loggedIn: ['s13'], local: { sfmcStack: 's13', sfmcStackTs: 1 } })
+    await sw.send({ type: 'GET_CONNECTION_STATUS' })
+    await flush(450)
+    const login = { id: 7, active: true, url: 'https://mc.login.exacttarget.com/hub-cas/login' }
+    sw.onUpdated.fns.forEach((fn) => fn(7, { status: 'complete' }, login))
+    await sw.send({ type: 'GET_CONNECTION_STATUS' })
+    await flush(450)
+    expect(sw.sim.created.filter((t) => t.url.includes('mc.s13.marketingcloudapps.com')).length).toBe(1)
+  })
 })
 
 describe('Query Studio capture', () => {

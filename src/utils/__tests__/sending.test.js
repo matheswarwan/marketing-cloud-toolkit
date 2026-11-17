@@ -27,13 +27,12 @@ describe('SOAP reads (2026-11-10)', () => {
     expect(all).toContain('<QueryAllAccounts>true</QueryAllAccounts>')
   })
 
-  it('retries once with a fresh token when SFMC refuses it', async () => {
-    let tokens = 0
-    let dropped = 0
+  it('retries once with a renewed token when SFMC refuses it', async () => {
+    let renewed = 0
     const fetch = async (url, init) => ({ ok: true, status: 200, text: async () => (init.body.includes('T1') ? 'Login failed' : resp('OK', '')) })
-    const x = await soapRetrieve({ stack: 's10', objectType: 'Send', properties: ['ID'] }, { fetch, token: async () => `T${++tokens}`, drop: () => dropped++ })
+    const x = await soapRetrieve({ stack: 's10', objectType: 'Send', properties: ['ID'] }, { fetch, token: async () => 'T1', renew: async () => { renewed++; return 'T2' }, endpoint: async () => null })
     expect(x).toContain('<OverallStatus>OK')
-    expect(dropped).toBe(1)
+    expect(renewed).toBe(1)
   })
 
   it('parses results and follows MoreDataAvailable pages', async () => {

@@ -10,7 +10,7 @@
 // structured request (no raw XML); the service worker has no DOMParser, so the XML answer
 // goes back to the page to parse (utils/soapApi.js).
 
-import { getMcaToken, dropMcaToken } from './mcaToken.js'
+import { getMcaToken, renewMcaToken } from './mcaToken.js'
 import { sfmcFetch } from './fetchProxy.js'
 
 export const SOAP_OBJECTS = new Set([
@@ -23,6 +23,9 @@ export const SOAP_OBJECTS = new Set([
   // User, 2026-11-16 (ideas from VeLens): send problems, lists a send went to, and the
   // engagement feed (forwards, forward opt-ins, inbound SMS).
   'NotSentEvent', 'ListSend', 'ForwardedEmailEvent', 'ForwardedEmailOptInEvent', 'SMSMOEvent',
+  // Feedback #1077 (IP addresses): the account's private IPs (Retrieve checked live on s10,
+  // 2026-11-17). DeliveryProfile has no Retrieve handler ("Unable to find a handler").
+  'PrivateIP',
 ])
 const OPERATORS = new Set(['equals', 'notEquals', 'greaterThan', 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual', 'IN', 'like', 'isNull', 'isNotNull', 'between'])
 const STACK = /^s\d{1,3}$/i
@@ -98,7 +101,7 @@ const authFailed = (status, text) => status === 401 || /Login failed|not authori
  * One Retrieve call; returns the response XML. Retries once with a fresh token. Sends to
  * the account's SOAP address; when that host can't be reached, tries webservice.<stack>.
  */
-export async function soapRetrieve(request, { fetch: doFetch = fetch, token: tokenFor = getMcaToken, drop = dropMcaToken, endpoint = soapEndpoint } = {}) {
+export async function soapRetrieve(request, { fetch: doFetch = fetch, token: tokenFor = getMcaToken, renew = renewMcaToken, endpoint = soapEndpoint } = {}) {
   const { stack } = request
   if (!STACK.test(String(stack || ''))) throw new Error('Unknown stack')
   const legacy = soapUrl(stack)
@@ -115,11 +118,13 @@ export async function soapRetrieve(request, { fetch: doFetch = fetch, token: tok
     }
   }
   for (let attempt = 0; attempt < 2; attempt++) {
-    const token = await tokenFor(stack)
+    // A refused token is renewed (the app signs in again), not just asked for again: the
+    // token address hands out the same dead token after a new login (feedback #1104).
+    const token = attempt ? await renew(stack) : await tokenFor(stack)
     if (!token) throw new Error('No Marketing Cloud session for SOAP. Log in to SFMC in any tab, then try again.')
     const res = await post(token)
     const text = await res.text()
-    if (attempt === 0 && authFailed(res.status, text)) { drop(stack); continue }
+    if (attempt === 0 && authFailed(res.status, text)) continue
     if (!res.ok && !/<OverallStatus>/.test(text)) throw new Error(`SFMC SOAP error ${res.status}`)
     return text
   }

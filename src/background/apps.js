@@ -67,6 +67,9 @@ export const SFMC_APPS = [
   {
     id: 'contentBuilder',
     name: 'Content Builder',
+    // Stays in the business unit of its last sign-in (checked live on s10, 2026-11-17): appBu.js.
+    followsBusinessUnit: false,
+    tokenContextUrl: (s) => `https://content-builder.${s}.marketingcloudapps.com/fuelapi/platform/v1/tokenContext`,
     matches: (url) => url.hostname.startsWith('content-builder.'),
     bearer: true,
     csrfCookie: '_csrf',
@@ -94,6 +97,9 @@ export const SFMC_APPS = [
   {
     id: 'journeyBuilder',
     name: 'Journey Builder',
+    // Stays in the business unit the user logged in to (checked live on s10, 2026-11-17): appBu.js.
+    followsBusinessUnit: false,
+    tokenContextUrl: (s) => `https://jbinteractions.${s}.marketingcloudapps.com/fuelapi/platform/v1/tokenContext`,
     matches: (url) => url.hostname.startsWith('jbinteractions.'),
     bearer: false,
     probeUrl: (s) => `https://jbinteractions.${s}.marketingcloudapps.com/fuelapi/interaction/v1/eventDefinitions?$page=1&$pagesize=1`,

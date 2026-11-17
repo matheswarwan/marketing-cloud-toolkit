@@ -27,8 +27,11 @@ import { restoreCsrfTokens, sniffCsrf, getCoreCsrf } from './csrf.js'
 import { restorePageHeaders, sniffPageHeaders } from './pageHeaders.js'
 import { restoreJbCsrf, sniffJbCsrf } from './jbCsrf.js'
 import { automationSummary } from './automationSummary.js'
+import { stackFromPageUrl } from './apps.js'
+import { noteContextSwitch, forgetAppUnits } from './appBu.js'
+import { clearCurrentBusinessUnit } from './businessUnit.js'
 import {
-  getMcaToken, isMcaTokenReady, mintBackoff, dropMcaToken, handleCapturedToken, setOnMintFailure,
+  getMcaToken, isMcaTokenReady, mintBackoff, dropMcaToken, handleCapturedToken, setOnMintFailure, clearMintBackoff, handleMintTabUpdate, handleRenewTabUpdate, isMintTab,
 } from './mcaToken.js'
 import { sessionStatus, connectApp, warmUpMissing } from './sessions.js'
 import { sfmcFetch } from './fetchProxy.js'
@@ -76,7 +79,12 @@ chrome.tabs?.onActivated?.addListener(({ tabId }) => {
   chrome.tabs.get(tabId, (tab) => { if (!chrome.runtime.lastError && tab) rememberActiveStack(tab.url, tab.id) })
 })
 chrome.tabs?.onUpdated?.addListener((tabId, info, tab) => {
-  if (info.status === 'complete' && tab?.active) rememberActiveStack(tab.url, tab.id)
+  if (info.url && isMintTab(tabId)) handleMintTabUpdate(tabId, info.url)
+  if (isMintTab(tabId)) handleRenewTabUpdate(tabId, info, tab)
+  if (info.status !== 'complete') return
+  if (tab?.active) rememberActiveStack(tab.url, tab.id)
+  // A logged-in SFMC page: the session may be new, so a failed token is asked again (feedback #1104).
+  if (!isMintTab(tabId) && isSfmcUrl(tab?.url) && isLoggedInUrl(tab.url)) clearMintBackoff(stackFromPageUrl(tab.url))
 })
 
 chrome.storage?.onChanged?.addListener((changes, area) => {
@@ -89,6 +97,10 @@ chrome.storage?.onChanged?.addListener((changes, area) => {
 // The stack of stackless pages (mc.exacttarget.com, feedback #76): see stack.js.
 chrome.webRequest?.onBeforeRequest.addListener(
   noteRequestStack, { urls: ['https://*.exacttarget.com/*', 'https://*.marketingcloudapps.com/*'] })
+// A business unit switch in SFMC: apps that stay in their unit are checked again (appBu.js).
+chrome.webRequest?.onBeforeRequest.addListener(
+  (d) => noteContextSwitch(d, (stack) => { clearCurrentBusinessUnit(stack); forgetAppUnits(stack) }),
+  { urls: ['https://*.exacttarget.com/cloud/context-switch.html*'] })
 chrome.webRequest?.onBeforeSendHeaders.addListener(
   sniffCsrf, { urls: ['https://*.exacttarget.com/*'] }, ['requestHeaders', 'extraHeaders'])
 // Contact Builder's own headers for the contacts calls (pageHeaders.js).

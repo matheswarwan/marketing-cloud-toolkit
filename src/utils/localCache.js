@@ -10,20 +10,30 @@ export const CACHE_DAYS = 30
 export const CACHE_MAX_AGE = CACHE_DAYS * 24 * 60 * 60 * 1000
 export const CACHE_PREFIX = 'cache:'
 
-// The business unit of a stack, asked once per app tab (switching BU in SFMC is seen
-// on the next app tab, or with forgetScope).
-const scopes = new Map()
-export function cacheScope(stack, fetchBU = fetchCurrentBU) {
+// The business unit of a stack, asked again after SCOPE_TTL (user, 2026-11-17: after a
+// unit switch in SFMC, an open app tab kept storing the new unit's data under the old
+// one), or at once after forgetScope.
+export const SCOPE_TTL = 60 * 1000
+const scopes = new Map() // stack → { at, promise }
+export function cacheScope(stack, fetchBU = fetchCurrentBU, now = Date.now()) {
   if (!stack) return Promise.resolve('none:0')
-  if (!scopes.has(stack)) {
-    const p = fetchBU(stack).then((bu) => `${stack}:${bu?.accountId ?? 0}`).catch(() => `${stack}:0`)
-    scopes.set(stack, p)
+  const hit = scopes.get(stack)
+  if (!hit || now - hit.at > SCOPE_TTL) {
+    const promise = fetchBU(stack).then((bu) => `${stack}:${bu?.accountId ?? 0}`).catch(() => `${stack}:0`)
+    scopes.set(stack, { at: now, promise })
+    return promise
   }
-  return scopes.get(stack)
+  return hit.promise
 }
 export function forgetScope(stack) { if (stack) scopes.delete(stack); else scopes.clear() }
 
-export const cacheKey = (scope, kind, sub = '') => `${CACHE_PREFIX}${kind}:${scope}${sub !== '' ? `:${sub}` : ''}`
+// Lists and folders read from Content Builder and Journey Builder, which stayed in the
+// unit they signed in to until 2.0.25 (background/appBu.js): what was stored before may
+// be another unit's, so those kinds start again under a new version.
+const RESTARTED_KINDS = /^(?:list-emails|list-journeys|folders-journeys|folders-content-.*)$/
+export const storedKind = (kind) => (RESTARTED_KINDS.test(kind) ? `${kind}@2` : kind)
+
+export const cacheKey = (scope, kind, sub = '') => `${CACHE_PREFIX}${storedKind(kind)}:${scope}${sub !== '' ? `:${sub}` : ''}`
 
 /** { value, savedAt } when stored and younger than maxAge, else null. */
 export async function readCache(key, maxAge = CACHE_MAX_AGE) {
@@ -36,7 +46,7 @@ export const peekCache = (key) => peekSaved(key)
 
 /** Forgets one kind (or everything stored by this module when kind is empty). */
 export function forgetCache(kind = '', scope = '') {
-  return forget(kind ? `${CACHE_PREFIX}${kind}:${scope ? `${scope}:` : ''}` : CACHE_PREFIX)
+  return forget(kind ? `${CACHE_PREFIX}${storedKind(kind)}:${scope ? `${scope}:` : ''}` : CACHE_PREFIX)
 }
 
 /**

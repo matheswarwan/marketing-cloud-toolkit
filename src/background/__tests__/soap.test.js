@@ -42,7 +42,7 @@ describe('SOAP address from the account endpoint list (feedback #1102)', () => {
 describe('soapRetrieve addresses (feedback #1102)', () => {
   it('posts to the tenant address with a matching <a:To>', async () => {
     const fetch = vi.fn(async () => answer())
-    await soapRetrieve(request, { fetch, token, drop: () => {}, endpoint: async () => 'https://t1.soap.marketingcloudapis.com/Service.asmx' })
+    await soapRetrieve(request, { fetch, token, renew: async () => 'tok2', endpoint: async () => 'https://t1.soap.marketingcloudapis.com/Service.asmx' })
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(fetch.mock.calls[0][0]).toBe('https://t1.soap.marketingcloudapis.com/Service.asmx')
     expect(fetch.mock.calls[0][1].body).toContain('<a:To s:mustUnderstand="1">https://t1.soap.marketingcloudapis.com/Service.asmx</a:To>')
@@ -50,22 +50,34 @@ describe('soapRetrieve addresses (feedback #1102)', () => {
 
   it('falls back to webservice.<stack> when the tenant host cannot be reached', async () => {
     const fetch = vi.fn(async (url) => { if (url.includes('t1.soap')) throw new TypeError('Failed to fetch'); return answer() })
-    await soapRetrieve(request, { fetch, token, drop: () => {}, endpoint: async () => 'https://t1.soap.marketingcloudapis.com/Service.asmx' })
+    await soapRetrieve(request, { fetch, token, renew: async () => 'tok2', endpoint: async () => 'https://t1.soap.marketingcloudapis.com/Service.asmx' })
     expect(fetch.mock.calls.map((c) => c[0])).toEqual(['https://t1.soap.marketingcloudapis.com/Service.asmx', 'https://webservice.s13.exacttarget.com/Service.asmx'])
   })
 
   it('says which host could not be reached instead of a bare "Failed to fetch"', async () => {
     const fetch = vi.fn(async () => { throw new TypeError('Failed to fetch') })
-    await expect(soapRetrieve(request, { fetch, token, drop: () => {}, endpoint: async () => null }))
+    await expect(soapRetrieve(request, { fetch, token, renew: async () => 'tok2', endpoint: async () => null }))
       .rejects.toThrow("Could not reach SFMC's SOAP API for s13 (webservice.s13.exacttarget.com): Failed to fetch")
   })
 
-  it('retries once with a fresh token on the same address', async () => {
+  it('retries once with a renewed token on the same address', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(answer('Login failed', 401)).mockResolvedValueOnce(answer())
-    const drop = vi.fn()
-    await soapRetrieve(request, { fetch, token, drop, endpoint: async () => 'https://t1.soap.marketingcloudapis.com/Service.asmx' })
-    expect(drop).toHaveBeenCalledWith('s13')
+    const renew = vi.fn(async () => 'tok2')
+    await soapRetrieve(request, { fetch, token, renew, endpoint: async () => 'https://t1.soap.marketingcloudapis.com/Service.asmx' })
+    expect(renew).toHaveBeenCalledWith('s13')
     expect(fetch.mock.calls.map((c) => c[0])).toEqual(Array(2).fill('https://t1.soap.marketingcloudapis.com/Service.asmx'))
+    expect(fetch.mock.calls[1][1].body).toContain('>tok2</fueloauth>')
+  })
+
+  // Feedback #1104 follow-up: SFMC answers a dead token with a 500 "Login Failed" fault.
+  it('renews the token on a 500 Login Failed fault, and says to log in when renewal fails', async () => {
+    const fault = answer('<soap:Fault><soap:Reason><soap:Text>Login Failed</soap:Text></soap:Reason></soap:Fault>', 500)
+    const fetch = vi.fn().mockResolvedValueOnce(fault).mockResolvedValueOnce(answer())
+    const renew = vi.fn(async () => 'tok2')
+    await soapRetrieve(request, { fetch, token, renew, endpoint: async () => null })
+    expect(renew).toHaveBeenCalledTimes(1)
+    const again = vi.fn().mockResolvedValueOnce(fault)
+    await expect(soapRetrieve(request, { fetch: again, token, renew: async () => null, endpoint: async () => null })).rejects.toThrow(/Log in to SFMC/)
   })
 
   it('still refuses an unknown stack before any call', async () => {

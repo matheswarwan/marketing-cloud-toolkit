@@ -12,6 +12,12 @@ export function toBusinessUnit(d) {
   return { name: d.name, accountId: d.accountId ?? d.id ?? d.memberId ?? null }
 }
 
+/** Forgets the cached unit (SFMC switched business unit). */
+export function clearCurrentBusinessUnit(stack) {
+  if (stack) delete cache[stack]
+  else for (const k of Object.keys(cache)) delete cache[k]
+}
+
 export async function fetchCurrentBusinessUnit(stack) {
   const hit = cache[stack]
   if (hit && Date.now() - hit.ts < TTL) return hit.bu
