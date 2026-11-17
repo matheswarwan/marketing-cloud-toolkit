@@ -116,7 +116,7 @@ describe('Data model (2026-11-10)', () => {
     const rels = mapRelationships(rawSets)
     expect(rels.map((r) => r.id)).toEqual(['R1', 'R2'])
     expect(rels[0].left).toEqual({ kind: 'group', id: 'G1', cardinality: 'One' })
-    expect(rels[0].fields).toEqual([{ left: 'Contact Key', right: 'MemberKey' }])
+    expect(rels[0].fields).toEqual([{ left: 'Contact Key', right: 'MemberKey', leftId: '', rightId: 'a1' }])
     expect(cardinalityText('One', 'Many')).toBe('one-to-many')
     expect(cardinalityText('Many', 'One')).toBe('many-to-one')
     expect(cardinalityText('', '')).toBe('')

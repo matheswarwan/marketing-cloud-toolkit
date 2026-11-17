@@ -8,6 +8,42 @@
 
 export const TO_TEST = [
   {
+    version: '2.0.25',
+    status: 'Not released: test builds only',
+    items: [
+      {
+        id: '2.0.25-automation-paging', area: 'Automation', title: 'Automations past 100', ref: '#1100', from: 'a user (no name given)', live: false,
+        where: 'Automation > Automations; Automation overview',
+        steps: ['In an account with more than 100 automations, search with an empty box.', 'Click Load more until it stops.'],
+        expect: 'Every automation loads, 50 at a time, and Load more disappears at the end. Checked live on s10 (452 automations).',
+      },
+      {
+        id: '2.0.25-soap-host', area: 'Setup', title: 'SOAP pages on newer stacks', ref: '#1102, #1103', from: 'a user (no name given)', live: true,
+        where: 'Setup > Users and roles; Sending > Sends (on s11, s12, s13, s50 or s51)',
+        steps: ['On an account on one of those stacks, open Users and roles and Sends.'],
+        expect: 'Both load (they said "Failed to fetch"). Chrome asks to accept the new SOAP host permission on update. Only s10 checked live.',
+      },
+      {
+        id: '2.0.25-login-after-open', area: 'General', title: 'Logging in after the Toolkit was opened', ref: 'user, 2026-11-17', from: 'Mathes', live: false,
+        where: 'Setup > Users and roles (any SOAP page)',
+        steps: ['Log out of SFMC, or wait for the session to end.', 'Open the Toolkit on Users and roles; wait 15 seconds.', 'Log in to SFMC in another tab and come back without reloading.'],
+        expect: 'First "No logged-in Marketing Cloud tab found ..."; within about 5 seconds of logging in the page loads by itself (it said "Unknown stack" until reloaded). Checked live on s10 with the session lookup blocked.',
+      },
+      {
+        id: '2.0.25-suppression-contents', area: 'Contacts', title: 'Suppression list contents', ref: 'user, 2026-11-17', from: 'Mathes', live: false,
+        where: 'Contacts > Suppression lists, click a list name',
+        steps: ['Click a list.', 'Filter the addresses, Load 50k rows, download CSV.'],
+        expect: 'The list\'s addresses and dates added open in Preview data. Checked live on s10 (SendGrid Auto Suppression, 86 rows).',
+      },
+      {
+        id: '2.0.25-data-model-map', area: 'Contacts', title: 'Data model diagram like Data Designer', ref: 'user, 2026-11-17', from: 'Mathes', live: false,
+        where: 'Contacts > Data model (Diagram)',
+        steps: ['Compare the groups and attribute counts with Data Designer.', 'Open a group; hover and click cards; zoom and pan.', 'In a set\'s panel: View contents, Query this set, Query both joined, Where used, Copy attributes.', 'Search for an attribute; go Back from Preview data.'],
+        expect: 'Counts match Data Designer; links show cardinality and join fields; actions open the right pages; Back returns to the same group and set. Checked live on s10. A synchronized set\'s rows may be refused by SFMC (403), as on the Data Extensions page.',
+      },
+    ],
+  },
+  {
     version: '2.0.24',
     status: 'Packaged for the Chrome Web Store',
     items: [

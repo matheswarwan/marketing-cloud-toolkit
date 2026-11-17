@@ -1,5 +1,15 @@
 # Work in progress
 
+## Errors in new features, suppression list contents, data model diagram (2026-11-17, same branch, not committed)
+
+- User: "most of the latest released features have errors". Swept 25 pages from 2.0.23 and 2.0.24 live on s10. Cause found: a Toolkit tab opened before logging in (or left open past the session) never learned the stack, so every SOAP page said "Unknown stack" (Business units showed 0) until reloaded. Fixed in `useStack` (retry every 5 s and on focus, `whenStack` runs again), with `noStackError()` instead of "Unknown stack". Checked live with the session lookup blocked, then unblocked: the page loaded by itself. With a fresh session all 25 pages load; Sends Details, email Checks, Send problems, Data model, Recycle bin, Import results used live.
+- Feedback #1103 (2.0.24): "Could not read the sends: Failed to fetch": same cause as #1102 (SOAP host), fixed on this branch.
+- Suppression lists: each list opens its addresses in Preview data (a list is a data extension, checked live).
+- Data model: new Diagram (see claude-context, Data model diagram). Checked live on s10: counts match Data Designer, cards, links, panel, View contents, Query this set, search, Back, dark mode.
+- Not yet tried by hand from 2.0.24: Starter queries into Run Query, journey Email results, Subscriber lookup in every BU, Ctrl+K, Dark/Images off/Mobile previews. Contact deletions shows raw JSON (field names unconfirmed): map them from the live answer.
+- Next: user review, then commit (asked to commit only when told) and the PR; then #1077 (IP addresses and sender settings).
+
+
 ## Feedback #1100 and #1102 (2026-11-16, branch `fix-feedback-1100-1102`)
 
 - #1100, automations stop at 100: Automation Studio's legacy list reads `$skip` as a page number (live on s10, 452 automations: `$top=50&$skip=2` gives rows 100-149; `$skip=50` gives no rows and `totalResults: 0`). The Toolkit sent row offsets, and Load more took the total from the empty answer (0), which hid the button. Fixed in `utils/automationPaging.js` (rows to pages), `automationApi.js` (search, folder forms, change reads, Load more total) and `background/dashboard.js`. Checked live: Load more goes 50, 100, ..., 450, 452 and then stops.
