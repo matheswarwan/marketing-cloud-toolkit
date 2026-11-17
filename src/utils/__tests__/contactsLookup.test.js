@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   looksLikeEmail, fetchSubscribers, fetchListMemberships, fetchBounces, fetchUnsubscribes, fetchRecentSends, whyNoEmail,
-  deleteOperationRow, fetchDeleteOperations, fetchAllDeleteOperations, fetchDeleteStatus, fetchDeleteSummary,
+  deleteOperationRow, fetchDeleteOperations, fetchAllDeleteOperations, fetchDeleteStatus, fetchDeleteSummary, deleteSummaryTotals,
 } from '../contactsLookup.js'
 
 const resp = (results, status = 'OK') => `<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><RetrieveResponseMsg xmlns="http://exacttarget.com/wsdl/partnerAPI"><OverallStatus>${status}</OverallStatus><RequestID>a1b2c3d4-0000-0000-0000-000000000001</RequestID>${results}</RetrieveResponseMsg></soap:Body></soap:Envelope>`
@@ -101,6 +101,28 @@ describe('Contact deletions (2026-11-10)', () => {
     expect(deleteOperationRow({ id: 'x', operationStatus: 'Queued' })).toMatchObject({ id: 'x', status: 'Queued' })
   })
 
+  it('reads the documented fields of a delete operation', () => {
+    const r = deleteOperationRow({
+      operationID: 9, operationName: 'GDPR batch', status: 'CompletedWithErrors', deleteType: 'ContactAndAttributes', listName: 'To delete',
+      expectedListCount: 12, actualListCount: 10, successCount: 9, errorCount: 1, scheduledTime: 's', startTime: 'a', endTime: 'b',
+      restorableUntilDate: 'r', createdDate: 'c', createdBy: 4401,
+    })
+    expect(r).toMatchObject({
+      id: '9', name: 'GDPR batch', status: 'CompletedWithErrors', type: 'Contacts and their data', list: 'To delete',
+      requested: 10, deleted: 9, failed: 1, scheduledDate: 's', startDate: 'a', endDate: 'b', restorableUntil: 'r', createdDate: 'c', createdBy: '4401',
+    })
+    expect(deleteOperationRow({ deleteType: 'AttributesOnly', expectedListCount: 5 })).toMatchObject({ type: 'Data only', requested: 5 })
+  })
+
+  it('totals the deletion summary by status', () => {
+    expect(deleteSummaryTotals({
+      startDateUtc: 'f', endDateUtc: 't',
+      totaltimeseries: [{ requestcount: 3 }, { requestCount: 2 }],
+      statustimeseries: [{ status: 'Completed', requestcount: 4 }, { Status: 'Processing', requestcount: 1 }],
+    })).toEqual({ total: 5, byStatus: [{ status: 'Completed', count: 4 }, { status: 'Processing', count: 1 }], from: 'f', to: 't' })
+    expect(deleteSummaryTotals({})).toEqual({ total: 0, byStatus: [], from: '', to: '' })
+  })
+
   it('asks for an operation status with the ID encoded', async () => {
     let url
     await fetchDeleteStatus('s10', 'a b', async (u) => { url = u; return {} })
@@ -110,7 +132,9 @@ describe('Contact deletions (2026-11-10)', () => {
   it('treats a 403 on the summary as a missing permission', async () => {
     const refuse = async () => { const e = new Error('SFMC API error 403: Account / User not authorized for operation.'); e.status = 403; throw e }
     expect(await fetchDeleteSummary('s10', refuse)).toEqual({ notAuthorized: true })
-    expect(await fetchDeleteSummary('s10', async () => ({ total: 2 }))).toEqual({ summary: { total: 2 } })
+    let url
+    expect(await fetchDeleteSummary('s10', async (u) => { url = u; return { total: 2 } }, { days: 30, now: Date.UTC(2026, 10, 17) })).toEqual({ summary: { total: 2 } })
+    expect(url).toMatch(/deleterequests\/summary\?startdateutc=2026-10-18T00%3A00%3A00.000Z&enddateutc=2026-11-17T00%3A00%3A00.000Z$/)
     await expect(fetchDeleteSummary('s10', async () => { throw new Error('SFMC API error 500: boom') })).rejects.toThrow(/500/)
   })
 })

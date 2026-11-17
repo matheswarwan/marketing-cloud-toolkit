@@ -28,15 +28,19 @@ describe('Contact deletions page', () => {
     expect(w.text()).not.toMatch(/SFMC API error/)
   })
 
-  it('lists operations with their status and raw JSON', async () => {
-    ops = [{ operationID: 77, status: 'Completed', deletedCount: 3 }]
-    summaryResult = { summary: { total: 1 } }
+  it('lists operations with their fields, the summary as numbers, and all fields on demand', async () => {
+    ops = [{ operationID: 77, operationName: 'Old leads', status: 'Completed', deleteType: 'ContactAndAttributes', actualListCount: 4, successCount: 3, deletedCount: 3 }]
+    summaryResult = { summary: { totaltimeseries: [{ requestcount: 6 }], statustimeseries: [{ status: 'Completed', requestcount: 6 }] } }
     const w = await mountPage()
     await flushPromises()
     expect(w.text()).toContain('1 operation')
     expect(w.text()).toContain('77')
+    expect(w.text()).toContain('Old leads')
+    expect(w.text()).toContain('Contacts and their data')
+    expect(w.find('[data-deletions-totals]').text()).toContain('6')
+    expect(w.text()).not.toMatch(/not confirmed/)
     expect(w.find('[data-deletions-no-access]').exists()).toBe(false)
-    const raw = w.findAll('button').find((b) => b.text() === 'Raw JSON')
+    const raw = w.findAll('button').find((b) => b.text() === 'All fields')
     await raw.trigger('click')
     expect(w.text()).toContain('"deletedCount": 3')
   })

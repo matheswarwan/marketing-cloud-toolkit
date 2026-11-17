@@ -4,8 +4,9 @@
 //   checked live on s10 that day (ModifiedDate on Subscriber and ListID on BounceEvent are
 //   not valid properties). The profile Attributes SFMC returns are never read or shown.
 // - Contact deletions: REST contacts/v1 deleteOperations (checked live: { page, pageSize,
-//   count, items }; no operations on the test account, so the item fields are guesses),
-//   the status of one operation (unverified) and the analytics summary (403 on s10).
+//   count, items }; item fields from SFMC's reference "Retrieve a List of Contact Deletion
+//   Operations", read 2026-11-17, as the test account has no operations), the status of
+//   one operation and the analytics summary (403 on s10; needs startdateutc and enddateutc).
 // Nothing here changes SFMC data: deletions are started in Contact Builder.
 import { sfmcFetch } from './sfmcApi.js'
 import { soapRetrieveAll } from './soapApi.js'
@@ -131,22 +132,34 @@ export function whyNoEmail(facts, now = Date.now()) {
 // ── Contact deletions (REST) ──────────────────────────────
 const first = (o, keys) => { for (const k of keys) if (o?.[k] != null && o[k] !== '') return o[k]; return null }
 
-/** Common fields of a delete operation under the names SFMC is likely to use (unconfirmed: no sample seen). */
+/**
+ * A delete operation under SFMC's documented names (getListOfContactDeleteOperations):
+ * operationID, operationName, status (PendingProcessing, Cancelling, Cancelled, Failed,
+ * Completed, CompletedWithErrors), deleteType (None, ContactAndAttributes, AttributesOnly),
+ * listName/listKey, expectedListCount, actualListCount, successCount, errorCount,
+ * scheduledTime, startTime, endTime, restorableUntilDate, createdDate, createdBy (an
+ * employee ID). Older spellings are kept as fallbacks.
+ */
 export function deleteOperationRow(o) {
   return {
-    id: String(first(o, ['operationID', 'operationId', 'OperationID', 'id', 'deleteOperationId']) ?? ''),
-    status: String(first(o, ['status', 'operationStatus', 'statusName', 'Status']) ?? ''),
-    type: String(first(o, ['type', 'operationType', 'deleteType', 'requestType']) ?? ''),
-    createdDate: first(o, ['createdDate', 'createDate', 'requestedDate', 'created', 'CreatedDate']) || '',
-    startDate: first(o, ['startDate', 'startedDate', 'startTime', 'StartDate']) || '',
-    endDate: first(o, ['endDate', 'completedDate', 'endTime', 'completeDate', 'EndDate']) || '',
-    requested: num(first(o, ['requestedCount', 'totalCount', 'contactCount', 'numberOfContacts', 'count'])),
-    deleted: num(first(o, ['deletedCount', 'processedCount', 'completedCount', 'successCount'])),
-    failed: num(first(o, ['failedCount', 'errorCount'])),
-    createdBy: String(first(o, ['createdBy', 'requestedBy', 'userName', 'createdByName']) ?? ''),
+    id: String(first(o, ['operationID', 'operationId', 'OperationID', 'id']) ?? ''),
+    name: String(first(o, ['operationName', 'OperationName']) ?? ''),
+    status: String(first(o, ['status', 'operationStatus', 'Status']) ?? ''),
+    type: DELETE_TYPES[first(o, ['deleteType', 'DeleteType'])] ?? String(first(o, ['deleteType', 'DeleteType']) ?? ''),
+    list: String(first(o, ['listName', 'listKey', 'listIdentifier']) ?? ''),
+    createdDate: first(o, ['createdDate', 'CreatedDate']) || '',
+    scheduledDate: first(o, ['scheduledTime']) || '',
+    startDate: first(o, ['startTime', 'startDate']) || '',
+    endDate: first(o, ['endTime', 'endDate']) || '',
+    restorableUntil: first(o, ['restorableUntilDate']) || '',
+    requested: num(first(o, ['actualListCount', 'expectedListCount'])),
+    deleted: num(first(o, ['successCount', 'deletedCount'])),
+    failed: num(first(o, ['errorCount', 'failedCount'])),
+    createdBy: String(first(o, ['createdBy', 'employeeID']) ?? ''),
     raw: o,
   }
 }
+const DELETE_TYPES = { None: 'None', ContactAndAttributes: 'Contacts and their data', AttributesOnly: 'Data only' }
 
 /** One page of delete operations: { page, pageSize, count, items }. */
 export async function fetchDeleteOperations(stack, page = 1, fetch = sfmcFetch) {
@@ -175,12 +188,30 @@ export const fetchDeleteStatus = (stack, operationId, fetch = sfmcFetch) =>
 /** A missing permission rather than a failure (403 or SFMC's "not authorized" text). */
 export const isNotAuthorized = (e) => e?.status === 403 || /\b403\b|not authori[sz]ed/i.test(String(e?.message || ''))
 
-/** { summary } or { notAuthorized: true } when the user or account may not read deletion analytics. */
-export async function fetchDeleteSummary(stack, fetch = sfmcFetch) {
+/**
+ * { summary } or { notAuthorized: true } when the user or account may not read deletion
+ * analytics. SFMC requires startdateutc and enddateutc (ContactsDeleteRequestsSummary);
+ * the last `days` days are asked for.
+ */
+export async function fetchDeleteSummary(stack, fetch = sfmcFetch, { days = 30, now = Date.now() } = {}) {
+  const end = new Date(now).toISOString()
+  const start = new Date(now - days * 86400000).toISOString()
   try {
-    return { summary: await fetch(`${API(stack)}/contacts/v1/contacts/analytics/deleterequests/summary`, 'GET') }
+    return { summary: await fetch(`${API(stack)}/contacts/v1/contacts/analytics/deleterequests/summary?startdateutc=${enc(start)}&enddateutc=${enc(end)}`, 'GET') }
   } catch (e) {
     if (isNotAuthorized(e)) return { notAuthorized: true }
     throw e
   }
+}
+
+/**
+ * The summary's totals: { total, byStatus: [{ status, count }], from, to }, from its
+ * totaltimeseries and statustimeseries (names in any case, as SFMC's reference mixes them).
+ */
+export function deleteSummaryTotals(summary) {
+  const lower = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k.toLowerCase(), v]))
+  const s = lower(summary)
+  const total = [].concat(s.totaltimeseries || []).map(lower)
+  const byStatus = [].concat(s.statustimeseries || []).map(lower).map((t) => ({ status: String(t.status ?? ''), count: num(t.requestcount) ?? 0 }))
+  return { total: total.reduce((n, t) => n + (num(t.requestcount) ?? 0), 0), byStatus, from: s.startdateutc || '', to: s.enddateutc || '' }
 }

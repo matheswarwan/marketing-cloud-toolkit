@@ -2,9 +2,9 @@
 // Contacts > Contact deletions (user, 2026-11-10): the contact delete operations SFMC has
 // (REST contacts/v1 deleteOperations, 50 a page), the status of one operation by its ID,
 // and the deletion summary when the account may read it (analytics routes answer 403 on
-// many accounts: shown as a note, not an error). The item fields of an operation were not
-// seen live (no deletions on the test account), so common names are tried and every row
-// has its raw JSON. Read-only: deletions are started in Contact Builder, never here.
+// many accounts: shown as a note, not an error). Operation fields follow SFMC's reference
+// (utils/contactsLookup.js deleteOperationRow); each row keeps SFMC's full answer behind
+// "All fields". Read-only: deletions are started in Contact Builder, never here.
 import { computed, ref } from 'vue'
 import { Loader2, RefreshCw, Search, Info } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
@@ -14,7 +14,7 @@ import DownloadMenu from '@/components/results/DownloadMenu.vue'
 import StatusBadge from '@/components/results/StatusBadge.vue'
 import { useStack, whenStack } from '@/composables/useStack.js'
 import { searchError } from '@/utils/sfmcErrors.js'
-import { fetchAllDeleteOperations, deleteOperationRow, fetchDeleteStatus, fetchDeleteSummary } from '@/utils/contactsLookup.js'
+import { fetchAllDeleteOperations, deleteOperationRow, fetchDeleteStatus, fetchDeleteSummary, deleteSummaryTotals } from '@/utils/contactsLookup.js'
 import { formatDateTime } from '@/utils/format.js'
 
 const { stack } = useStack()
@@ -41,14 +41,17 @@ whenStack(load)
 const d = (v) => formatDateTime(v)
 const n = (v) => (v == null ? '' : v.toLocaleString())
 const rows = computed(() => (list.value || []).map((o, i) => ({
-  ...o, key: o.id || `row-${i}`, created: d(o.createdDate), started: d(o.startDate), ended: d(o.endDate),
-  requestedText: n(o.requested), deletedText: n(o.deleted), failedText: n(o.failed),
+  ...o, key: o.id || `row-${i}`, created: d(o.createdDate), scheduled: d(o.scheduledDate), started: d(o.startDate), ended: d(o.endDate),
+  restorable: d(o.restorableUntil), requestedText: n(o.requested), deletedText: n(o.deleted), failedText: n(o.failed),
 })))
 const columns = [
-  { key: 'id', label: 'Operation ID' }, { key: 'status', label: 'Status' }, { key: 'type', label: 'Type', hidden: true }, { key: 'created', label: 'Created' },
-  { key: 'started', label: 'Started' }, { key: 'ended', label: 'Ended' }, { key: 'requestedText', label: 'Contacts' }, { key: 'deletedText', label: 'Deleted' },
-  { key: 'failedText', label: 'Failed', hidden: true }, { key: 'createdBy', label: 'Created by', hidden: true }, { key: 'raw', label: '', sortable: false, filterable: false },
+  { key: 'id', label: 'Operation ID' }, { key: 'name', label: 'Name' }, { key: 'status', label: 'Status' }, { key: 'type', label: 'Deletes' },
+  { key: 'list', label: 'Contacts from', hidden: true }, { key: 'created', label: 'Created' }, { key: 'scheduled', label: 'Scheduled', hidden: true },
+  { key: 'started', label: 'Started', hidden: true }, { key: 'ended', label: 'Ended' }, { key: 'requestedText', label: 'Contacts' },
+  { key: 'deletedText', label: 'Deleted' }, { key: 'failedText', label: 'Errors' }, { key: 'restorable', label: 'Restorable until' },
+  { key: 'createdBy', label: 'Created by (user ID)', hidden: true }, { key: 'raw', label: '', sortable: false, filterable: false },
 ]
+const totals = computed(() => (summary.value?.summary ? deleteSummaryTotals(summary.value.summary) : null))
 function toggle(key) {
   const next = new Set(expanded.value)
   if (next.has(key)) next.delete(key); else next.add(key)
@@ -74,7 +77,7 @@ const docCols = columns.filter((c) => c.label)
 const getDoc = () => ({
   title: 'Contact deletions',
   blocks: [
-    ...(summary.value?.summary ? [{ type: 'h', level: 2, text: 'Summary' }, { type: 'code', lang: 'json', text: pretty(summary.value.summary) }] : []),
+    ...(totals.value ? [{ type: 'h', level: 2, text: 'Delete requests, last 30 days' }, { type: 'table', columns: ['Status', 'Requests'], rows: [['All', String(totals.value.total)], ...totals.value.byStatus.map((t) => [t.status, String(t.count)])] }] : []),
     { type: 'h', level: 2, text: 'Delete operations' },
     rows.value.length ? { type: 'table', columns: docCols.map((c) => c.label), rows: rows.value.map((r) => docCols.map((c) => String(r[c.key] ?? ''))) } : { type: 'p', text: 'No contact deletions found.' },
   ],
@@ -92,20 +95,22 @@ const getDoc = () => ({
     </div>
 
     <section v-if="summary" class="rounded-lg border border-border bg-card p-3 text-xs" data-deletions-summary>
-      <h2 class="text-sm font-semibold mb-1">Summary</h2>
+      <h2 class="text-sm font-semibold mb-1">Delete requests, last 30 days</h2>
       <p v-if="summary.notAuthorized" class="flex items-start gap-1.5 rounded-md border border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/40 p-2 text-sky-900 dark:text-sky-200" data-deletions-no-access>
         <Info class="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>SFMC does not let this user or account read the deletion summary ("Account / User not authorized for operation"). This usually needs Contact Builder's contact delete permissions or the feature turned on for the account. The list of operations below does not need it.</span>
       </p>
       <SfmcErrorNotice v-else-if="summary.error" :error="summary.error" @retry="load" />
-      <pre v-else class="max-h-64 overflow-auto rounded bg-muted/40 p-2 font-mono text-[11px]">{{ pretty(summary.summary) }}</pre>
+      <dl v-else-if="totals" class="flex flex-wrap gap-x-6 gap-y-1" data-deletions-totals>
+        <div><dt class="text-muted-foreground">All</dt><dd class="text-base font-semibold">{{ totals.total.toLocaleString() }}</dd></div>
+        <div v-for="t in totals.byStatus" :key="t.status"><dt class="text-muted-foreground">{{ t.status || 'Other' }}</dt><dd class="text-base font-semibold">{{ t.count.toLocaleString() }}</dd></div>
+      </dl>
     </section>
 
     <SfmcErrorNotice v-if="error" :error="error" :retrying="busy" @retry="load" />
     <section class="rounded-lg border border-border bg-card">
       <div class="px-3 py-2 border-b border-border text-xs">
         <span v-if="list">{{ count.toLocaleString() }} {{ count === 1 ? 'operation' : 'operations' }}<template v-if="list.length < count">, {{ list.length.toLocaleString() }} read</template>.</span>
-        <span class="text-muted-foreground"> The field names of an operation are not confirmed yet: use Raw JSON to see everything SFMC sent.</span>
       </div>
       <div v-if="busy && !list" class="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 class="h-4 w-4 animate-spin" /> Reading the delete operations…</div>
       <div v-else-if="list && !list.length" class="p-4 text-sm space-y-1" data-deletions-empty>
@@ -114,7 +119,7 @@ const getDoc = () => ({
       </div>
       <DataTable v-else-if="list" :columns="columns" :rows="rows" row-key="key" :expanded="expanded" storage-key="contact-deletions" empty-text="No operations to show.">
         <template #cell-status="{ row }"><StatusBadge v-if="row.status" :status="row.status" /></template>
-        <template #cell-raw="{ row }"><button type="button" class="text-xs text-primary hover:underline" :aria-expanded="expanded.has(row.key)" @click="toggle(row.key)">{{ expanded.has(row.key) ? 'Hide JSON' : 'Raw JSON' }}</button></template>
+        <template #cell-raw="{ row }"><button type="button" class="text-xs text-primary hover:underline" :aria-expanded="expanded.has(row.key)" @click="toggle(row.key)">{{ expanded.has(row.key) ? 'Hide fields' : 'All fields' }}</button></template>
         <template #expanded="{ row }"><pre class="max-h-80 overflow-auto rounded bg-muted/40 p-2 font-mono text-[11px]">{{ pretty(row.raw) }}</pre></template>
       </DataTable>
     </section>
@@ -127,6 +132,7 @@ const getDoc = () => ({
         <span class="text-muted-foreground">The ID SFMC gave when the deletion was started.</span>
       </form>
       <SfmcErrorNotice v-if="opError" :error="opError" :retrying="opBusy" @retry="lookup" />
+      <p v-if="opResult" class="text-muted-foreground">SFMC's answer. In the delete phase, <code>backgroundOperationsSummary.backgroundOperationStatusID</code> says whether the deletion has finished.</p>
       <pre v-if="opResult" class="max-h-80 overflow-auto rounded bg-muted/40 p-2 font-mono text-[11px]">{{ pretty(opResult) }}</pre>
     </section>
   </div>
