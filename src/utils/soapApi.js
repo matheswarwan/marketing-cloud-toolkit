@@ -2,6 +2,8 @@
 // builds the envelope and adds the session token (background/soap.js); this module sends
 // the structured request, parses the XML answer and follows MoreDataAvailable pages.
 
+import { noStackError } from './stackDetection.js'
+
 export const SOAP_PAGE_LIMIT = 20 // 2,500 rows a page: up to 50,000 rows
 
 function send(request) {
@@ -49,6 +51,7 @@ export const asList = (v) => (v == null ? [] : Array.isArray(v) ? v : [v])
  * `onPage(rows, total)` gets each page. An "Error: ..." status throws with SFMC's text.
  */
 export async function soapRetrieveAll(stack, objectType, properties, { filter = null, queryAllAccounts = false, clientIds = null, onPage = null, retrieve = send, pageLimit = SOAP_PAGE_LIMIT } = {}) {
+  if (!stack) throw noStackError()
   let page = parseRetrieve(await retrieve({ stack, objectType, properties, filter, queryAllAccounts, ...(clientIds ? { clientIds } : {}) }))
   const rows = []
   for (let i = 0; ; i++) {

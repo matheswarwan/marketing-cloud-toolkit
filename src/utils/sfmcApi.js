@@ -2,6 +2,7 @@ import { createSharedDECatalog } from './sharedDEs.js'
 import { startRequest } from './activityStart.js'
 import { automationStudioId } from './automationIds.js'
 import { coreOrigin } from './sfmcHosts.js'
+import { noStackError } from './stackDetection.js'
 
 // Base URLs - exacttarget.com/cloud/fuelapi for core APIs (injected from ET tab)
 const AS_BASE = (stack) => `${coreOrigin(stack)}/cloud/fuelapi`
@@ -103,7 +104,11 @@ export function sfmcFetchQuiet(url, method, body = null) {
 }
 const maskDigits = (s) => String(s).replace(/\+?\d[\d\s()-]{5,}\d/g, '[number]')
 
+// A host built from a stack the page did not have yet (mc.null.exacttarget.com).
+const NO_STACK_HOST = /^https:\/\/[^/]*\.(?:null|undefined)\./i
+
 function proxyFetch(url, method, body, { quiet = false } = {}) {
+  if (NO_STACK_HOST.test(String(url))) return Promise.reject(noStackError())
   _callCount++
   const ts = Date.now()
   _log({ ts, type: 'req', method, url, body: quiet && body != null ? '[not logged]' : body })

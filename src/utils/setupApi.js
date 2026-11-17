@@ -10,6 +10,7 @@ import { ref } from 'vue'
 import { sfmcFetch } from './sfmcApi.js'
 import { coreOrigin } from './sfmcHosts.js'
 import { soapRetrieveAll } from './soapApi.js'
+import { noStackError } from './stackDetection.js'
 import { fetchTriggeredSends, fetchTmsDefinitions } from './messagingApi.js'
 
 const EMAIL_APP = (stack) => `https://email-app.${stack}.marketingcloudapps.com/fuelapi/messaging/v1`
@@ -286,7 +287,7 @@ const buLists = ref({}) // stack -> list, for reactive readers
 
 /** Every business unit of the stack's account, read once per app tab (force reads again). */
 export function loadBusinessUnits(stack, { force = false, retrieve } = {}) {
-  if (!stack) return Promise.resolve([])
+  if (!stack) return Promise.reject(noStackError())
   if (force || !buCache.has(stack)) {
     const p = fetchBusinessUnits(stack, { retrieve }).then((list) => { buLists.value = { ...buLists.value, [stack]: list }; return list })
     p.catch(() => buCache.delete(stack))
