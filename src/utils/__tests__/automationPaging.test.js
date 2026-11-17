@@ -13,27 +13,72 @@ function stub(handler) {
 const auto = (n) => ({ id: `a${n}`, name: `Automation ${n}` })
 const range = (from, to) => Array.from({ length: to - from }, (_, i) => auto(from + i))
 
-describe('loadMoreAutomations (feedback #28)', () => {
+// SFMC's legacy automation list as seen live on s10 (feedback #1100): `$skip` is a page
+// number, and a page past the end has no rows and totalResults 0.
+function sfmcList(count) {
+  const all = range(0, count)
+  return (url) => {
+    const top = Number(url.match(/\$top=(\d+)/)[1])
+    const page = Number(url.match(/\$skip=(\d+)/)[1])
+    const entry = all.slice(page * top, page * top + top)
+    return { startIndex: page * top, itemsPerPage: top, totalResults: entry.length ? count : 0, entry }
+  }
+}
+
+describe('loadMoreAutomations (feedback #28, #1100)', () => {
   beforeEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
 
-  it('uses the $skip page when it brings new automations', async () => {
-    stub((url) => (url.includes('$skip=50') ? { entry: range(50, 80), totalResults: 80 } : {}))
-    const { loadMoreAutomations } = await import('../automationApi.js')
-    const r = await loadMoreAutomations('s4', '', range(0, 50))
-    expect(r.entries.map((a) => a.id)).toEqual(range(50, 80).map((a) => a.id))
-    expect(r.total).toBe(80)
+  it('asks for the next page by number and keeps the total past 100 (#1100)', async () => {
+    const calls = stub(sfmcList(452))
+    const { searchAutomations, loadMoreAutomations } = await import('../automationApi.js')
+    let have = (await searchAutomations('s10', '', 0)).entries
+    let total = 0
+    while (have.length < 452) {
+      const r = await loadMoreAutomations('s10', '', have)
+      expect(r.entries.length).toBeGreaterThan(0)
+      have = [...have, ...r.entries]
+      total = r.total
+    }
+    expect(have.map((a) => a.id)).toEqual(range(0, 452).map((a) => a.id))
+    expect(total).toBe(452)
+    expect(calls.some((u) => u.includes('$top=50&$skip=2'))).toBe(true)
+    expect(calls.some((u) => u.includes('$skip=50'))).toBe(false)
   })
 
-  it('asks for a larger first page when $skip repeats the first page', async () => {
+  it('asks for a larger first page when the next page repeats the first one', async () => {
     const calls = stub((url) => {
-      if (url.includes('$skip=50')) return { entry: range(0, 50), totalResults: 80 }
+      if (url.includes('$top=50&$skip=1')) return { entry: range(0, 50), totalResults: 80 }
       if (url.includes('$top=100')) return { entry: range(0, 80), totalResults: 80 }
       return {}
     })
     const { loadMoreAutomations } = await import('../automationApi.js')
     const r = await loadMoreAutomations('s4', '', range(0, 50))
     expect(r.entries.map((a) => a.id)).toEqual(range(50, 80).map((a) => a.id))
-    expect(calls.some((u) => u.includes('$top=100') && u.includes('$skip=0'))).toBe(true)
+    expect(r.total).toBe(80)
+    expect(calls.some((u) => u.includes('$top=100&$skip=0'))).toBe(true)
+  })
+
+  it('never reports a total below what is shown when SFMC answers 0', async () => {
+    stub(() => ({ entry: [], totalResults: 0 }))
+    const { loadMoreAutomations } = await import('../automationApi.js')
+    const r = await loadMoreAutomations('s4', '', range(0, 100))
+    expect(r).toEqual({ entries: [], total: 100 })
+  })
+})
+
+describe('automationChanges paging (#1100)', () => {
+  beforeEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
+
+  it('reads the second page as $skip=1', async () => {
+    const urls = []
+    const { automationChanges } = await import('../automationApi.js')
+    const rows = (from) => range(from, from + 50).map((a, i) => ({ ...a, modifiedDate: new Date(Date.UTC(2026, 10, 16) - (from + i) * 60000).toISOString() }))
+    await automationChanges('s10', '', null, '2026-11-15T00:00:00Z', async (url) => {
+      urls.push(url)
+      const page = Number(url.match(/\$skip=(\d+)/)[1])
+      return { entry: page < 2 ? rows(page * 50) : [] }
+    })
+    expect(urls[1]).toContain('$top=50&$skip=1')
   })
 })
 

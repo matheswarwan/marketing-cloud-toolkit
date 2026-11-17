@@ -124,8 +124,11 @@ describe('dashboard lists', () => {
         urls.push(url)
         if (url.includes('accounts/@current')) return { name: 'BU', accountId: urls.filter((u) => u.includes('@current')).length }
         if (url.includes('automation/definition')) {
-          const skip = Number(url.match(/\$skip=(\d+)/)[1])
-          return { totalResults: 60, entry: Array.from({ length: Math.min(50, 60 - skip) }, (_, i) => ({ id: `a${skip + i}`, status: 6 })) }
+          // As SFMC answers (feedback #1100): $skip is a page number; past the end, no rows and total 0.
+          const top = Number(url.match(/\$top=(\d+)/)[1])
+          const from = Number(url.match(/\$skip=(\d+)/)[1]) * top
+          const n = Math.max(0, Math.min(top, 60 - from))
+          return { totalResults: n ? 60 : 0, entry: Array.from({ length: n }, (_, i) => ({ id: `a${from + i}`, status: 6 })) }
         }
         if (url.includes('/interactions?')) return { count: 3, items: [{ id: 'j1', status: 'Published' }, { id: 'j2', status: 'Draft' }, { id: 'j3', status: 'Stopped' }] }
         return {}

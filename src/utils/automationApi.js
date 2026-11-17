@@ -3,6 +3,7 @@ import { sfmcFetch } from './sfmcApi.js'
 import { changesSince } from './localCache.js'
 import { activityEndpoint } from './activityTypes.js'
 import { RESULTS_PAGE_SIZE } from './paging.js'
+import { legacyPageParams, legacyRows } from './automationPaging.js'
 
 export const AUTOMATION_PAGE_SIZE = RESULTS_PAGE_SIZE
 const AS = (stack) => `https://mc.${stack}.marketingcloudapps.com/AutomationStudioFuel3/fuelapi`
@@ -13,9 +14,12 @@ export async function searchAutomations(stack, query, skip = 0, top = AUTOMATION
   // live); the page also drops rows from other folders.
   const parts = [name ? `name like ${name}` : '', categoryId != null ? `categoryId eq ${Number(categoryId)}` : ''].filter(Boolean)
   const where = parts.length ? `&$where=${encodeURIComponent(parts.join(' and '))}` : ''
-  const data = await sfmcFetch(`${AS(stack)}/legacy/v1/beta/automations/automation/definition/?$top=${top}&$skip=${skip}&$sort=${encodeURIComponent('lastRunTime desc')}&view=gridView${where}`, 'GET')
-  const entries = data?.entry || []
-  return { entries, total: data?.totalResults ?? entries.length }
+  // `skip` counts rows; the list wants a page number (feedback #1100, automationPaging.js).
+  return legacyRows(skip, top, async (page) => {
+    const data = await sfmcFetch(`${AS(stack)}/legacy/v1/beta/automations/automation/definition/?${page}&$sort=${encodeURIComponent('lastRunTime desc')}&view=gridView${where}`, 'GET')
+    const entries = data?.entry || []
+    return { entries, total: data?.totalResults ?? entries.length }
+  })
 }
 
 /**
@@ -33,10 +37,10 @@ export async function searchAutomationsInFolder(stack, query, categoryId, skip =
   const cat = Number(categoryId)
   const name = query.trim()
   const nameWhere = name ? `name like ${name}` : ''
-  const legacy = (where, extra = '') => `${AS(stack)}/legacy/v1/beta/automations/automation/definition/?$top=${top}&$skip=${skip}&$sort=${encodeURIComponent('lastRunTime desc')}&view=gridView${where ? `&$where=${encodeURIComponent(where)}` : ''}${extra}`
+  const legacy = (where, extra = '', page = legacyPageParams(skip, top)) => `${AS(stack)}/legacy/v1/beta/automations/automation/definition/?${page}&$sort=${encodeURIComponent('lastRunTime desc')}&view=gridView${where ? `&$where=${encodeURIComponent(where)}` : ''}${extra}`
   const forms = {
-    where: async () => { const d = await fetch(legacy([nameWhere, `categoryId eq ${cat}`].filter(Boolean).join(' and ')), 'GET'); return { entries: d?.entry || [], total: d?.totalResults ?? (d?.entry || []).length } },
-    param: async () => { const d = await fetch(legacy(nameWhere, `&categoryId=${cat}`), 'GET'); return { entries: d?.entry || [], total: d?.totalResults ?? (d?.entry || []).length } },
+    where: () => legacyRows(skip, top, async (page) => { const d = await fetch(legacy([nameWhere, `categoryId eq ${cat}`].filter(Boolean).join(' and '), '', page), 'GET'); return { entries: d?.entry || [], total: d?.totalResults ?? (d?.entry || []).length } }),
+    param: () => legacyRows(skip, top, async (page) => { const d = await fetch(legacy(nameWhere, `&categoryId=${cat}`, page), 'GET'); return { entries: d?.entry || [], total: d?.totalResults ?? (d?.entry || []).length } }),
     rest: async () => {
       const page = Math.floor(skip / top) + 1
       const d = await fetch(`${AS(stack)}/automation/v1/automations?$page=${page}&$pagesize=${top}&$filter=${encodeURIComponent(`categoryId eq ${cat}`)}`, 'GET')
@@ -56,7 +60,7 @@ export async function searchAutomationsInFolder(stack, query, categoryId, skip =
       return { ...r, form: remembered }
     } catch { /* try them all again */ }
   }
-  const all = await fetch(legacy(nameWhere).replace(`$top=${top}`, '$top=1'), 'GET').catch(() => null)
+  const all = await fetch(legacy(nameWhere, '', legacyPageParams(0, 1)), 'GET').catch(() => null)
   const allTotal = all?.totalResults ?? null
   for (const f of FOLDER_FORMS) {
     let r
@@ -86,26 +90,28 @@ export function automationChanges(stack, query, categoryId, since, fetch = sfmcF
   const parts = [name ? `name like ${name}` : '', categoryId != null ? `categoryId eq ${Number(categoryId)}` : ''].filter(Boolean)
   const where = parts.length ? `&$where=${encodeURIComponent(parts.join(' and '))}` : ''
   return changesSince(since, async (page) => {
-    const skip = (page - 1) * AUTOMATION_PAGE_SIZE
-    const data = await fetch(`${AS(stack)}/legacy/v1/beta/automations/automation/definition/?$top=${AUTOMATION_PAGE_SIZE}&$skip=${skip}&$sort=${encodeURIComponent('modifiedDate desc')}&view=gridView${where}`, 'GET')
+    const data = await fetch(`${AS(stack)}/legacy/v1/beta/automations/automation/definition/?${legacyPageParams((page - 1) * AUTOMATION_PAGE_SIZE, AUTOMATION_PAGE_SIZE)}&$sort=${encodeURIComponent('modifiedDate desc')}&view=gridView${where}`, 'GET')
     return data?.entry || []
   })
 }
 
 /**
- * The next page after the automations in `have`, without repeats. When the $skip page
- * brings nothing new (SFMC repeated the first page or returned none, feedback #28),
- * asks for everything from the start up to one page more and keeps the new ones.
+ * The next page after the automations in `have`, without repeats. When that page brings
+ * nothing new (SFMC repeated the first page or returned none, feedback #28), asks for
+ * everything from the start up to one page more and keeps the new ones. The total comes
+ * from the answer that had rows: a page past the end says 0 (feedback #1100).
  */
 export async function loadMoreAutomations(stack, query, have, categoryId = null) {
   const known = new Set(have.map((a) => a.id))
   const r = await searchAutomations(stack, query, have.length, AUTOMATION_PAGE_SIZE, categoryId)
   let entries = r.entries.filter((a) => !known.has(a.id))
+  let total = r.entries.length ? r.total : 0
   if (!entries.length) {
     const all = await searchAutomations(stack, query, 0, have.length + AUTOMATION_PAGE_SIZE, categoryId)
     entries = all.entries.filter((a) => !known.has(a.id))
+    if (all.entries.length) total = all.total
   }
-  return { entries, total: r.total }
+  return { entries, total: Math.max(total, have.length + entries.length) }
 }
 
 /** The automation and its error notifications (null when those can't be read). */
