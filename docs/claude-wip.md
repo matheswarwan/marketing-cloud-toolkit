@@ -1,5 +1,16 @@
 # Work in progress
 
+## Feedback #1104, business unit switch, #1077, Contact deletions (2026-11-17, same branch, not committed)
+
+- PR #15 open (`fix-feedback-1100-1102` into main) with the earlier commits; everything below is uncommitted on the same branch.
+- #1103 is #1102. #1104: two causes, both fixed and in claude-context (Auth): the 2-minute mint pause after a failure, and the dead token after a new login (renewal through `AutomationStudioFuel3/?hub=1&ks=ks`). Live: logged-out lookup fails in 2.6 s (was 10.7 s); the stale-token state was seen live (SOAP "Login Failed"), and the `ks=ks` sign-in made SOAP answer OK. Not yet seen end to end: the Toolkit renewing by itself right after a new login (needs one logout and login).
+- Business unit switch: Content Builder and Journey Builder stayed in old units (silently wrong data). `appBu.js` moves them; checked live switching Mathes CDP to Mathes Sandbox (both followed on the first call, about 1.5 to 2 s). Cache scope now expires after 60 s; Content Builder / Journey Builder caches restarted (`@2`).
+- #1077 done: IP addresses on Send settings (PrivateIP; none in Mathes Sandbox). Delivery profiles cannot be read through SOAP (checked live).
+- Contact deletions: documented field names and the summary's required dates (not seen live, s10 has no deletions).
+- 2.0.24 hand checks done live in Mathes Sandbox: starter query in Run Query (41 s, 2 rows), Ctrl+K name and JobID, Sends by JobID, Subscriber in every BU (33 units), journey Email results, Dark/Images off/Mobile previews.
+- Tests: 2,009+ passing when the machine is not overloaded; earlier timeouts came from another project's suite and low memory.
+- Next: user review, commit to PR #15 when asked; ask the user for one logout and login to see the token renewal end to end.
+
 ## Errors in new features, suppression list contents, data model diagram (2026-11-17, same branch, not committed)
 
 - User: "most of the latest released features have errors". Swept 25 pages from 2.0.23 and 2.0.24 live on s10. Cause found: a Toolkit tab opened before logging in (or left open past the session) never learned the stack, so every SOAP page said "Unknown stack" (Business units showed 0) until reloaded. Fixed in `useStack` (retry every 5 s and on focus, `whenStack` runs again), with `noStackError()` instead of "Unknown stack". Checked live with the session lookup blocked, then unblocked: the page loaded by itself. With a fresh session all 25 pages load; Sends Details, email Checks, Send problems, Data model, Recycle bin, Import results used live.

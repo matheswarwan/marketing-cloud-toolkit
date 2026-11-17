@@ -41,6 +41,30 @@ export const TO_TEST = [
         steps: ['Compare the groups and attribute counts with Data Designer.', 'Open a group; hover and click cards; zoom and pan.', 'In a set\'s panel: View contents, Query this set, Query both joined, Where used, Copy attributes.', 'Search for an attribute; go Back from Preview data.'],
         expect: 'Counts match Data Designer; links show cardinality and join fields; actions open the right pages; Back returns to the same group and set. Checked live on s10. A synchronized set\'s rows may be refused by SFMC (403), as on the Data Extensions page.',
       },
+      {
+        id: '2.0.25-soap-session-retry', area: 'Contacts', title: 'Retry works right after logging in', ref: '#1104', from: 'a user (no name given)', live: false,
+        where: 'Contacts > Subscriber lookup (any SOAP page)',
+        steps: ['Log out of SFMC (or let the session end).', 'Look up a subscriber.', 'Log in to SFMC in another tab, come back and click Retry at once.'],
+        expect: 'Logged out: "No Marketing Cloud session for SOAP ..." after about 2 seconds (it took 10). After logging in, Retry loads the subscriber: it kept saying "log in" for up to 2 minutes, or "SFMC SOAP error 500" (SFMC refused the old session\'s token) until Automation Studio was opened. Logged-out half checked live on s10; the renewal after a new login is unit-tested only.',
+      },
+      {
+        id: '2.0.25-bu-switch', area: 'General', title: 'Switching business unit in SFMC', ref: 'user, 2026-11-17', from: 'Mathes', live: true,
+        where: 'Content > Emails; Journeys (any Content Builder or Journey Builder page)',
+        steps: ['Open Emails and Journeys in one business unit.', 'Switch business unit in SFMC\'s header.', 'Search Emails and Journeys again in the Toolkit (same tab).'],
+        expect: 'The new unit\'s emails and journeys (they showed the old unit\'s: Content Builder stayed in its sign-in unit, Journey Builder in the login unit; an email of the new unit said "SFMC API error 404"). The first call after the switch takes a second or two longer. Checked live on s10 (Mathes CDP to Mathes Sandbox).',
+      },
+      {
+        id: '2.0.25-ip-addresses', area: 'Sending', title: 'IP addresses on Send settings', ref: '#1077', from: 'a user (no name given)', live: false,
+        where: 'Sending > Send settings, IP addresses',
+        steps: ['Open Send settings in an account with a dedicated IP, and in one without.'],
+        expect: 'The private IP addresses with name and active state, or a note that the account uses shared IPs. Delivery profiles cannot be read through SFMC\'s API (checked live), so only their keys show. Checked live on s10 Mathes Sandbox (no private IP).',
+      },
+      {
+        id: '2.0.25-contact-deletions', area: 'Contacts', title: 'Contact deletions in plain columns', ref: 'user, 2026-11-17', from: 'Mathes', live: false,
+        where: 'Contacts > Contact deletions',
+        steps: ['In an account with contact deletions, open the page.', 'Check Name, Status, Deletes, Contacts, Deleted, Errors and Restorable until against Contact Builder.', 'Open All fields on a row.'],
+        expect: 'Columns filled from SFMC\'s documented fields (it showed raw JSON); the summary shows request counts per status for the last 30 days, or a note when the account may not read it. Not checked live: the test account has no deletions.',
+      },
     ],
   },
   {
