@@ -101,7 +101,9 @@ export function matchField(q, de, field) {
     }
     if (!reads) {
       const bare = new RegExp(`(?<![.\\w-])(?:\\[${f}\\]|${f}(?![\\w-]))(?!\\s*\\.)`, 'i')
-      if (bare.test(text)) reads = tables.length === 1 ? 'yes' : 'maybe'
+      // Names after AS are output columns (or table aliases, or CAST types), not reads: in
+      // `DE1.DateOfSent AS DateOfSent` the bare DateOfSent is the output name (live s10, #1106).
+      if (bare.test(text.replace(/\bAS\s+(?:\[[^\]]*\]|[\w-]+)/gi, ' '))) reads = tables.length === 1 ? 'yes' : 'maybe'
       else if (tables.length === 1 && /\bselect\s+(?:top\s+\d+\s+)?(?:distinct\s+)?\*/i.test(text)) reads = 'all'
     }
   }
