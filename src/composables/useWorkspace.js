@@ -100,13 +100,23 @@ export function useWorkspace() {
   // used (kept under LAST_WORKSPACE_KEY), else a new one.
   // The last workspace is skipped when another tab has it open, so two tabs never
   // save over each other's panels.
-  async function restore(wsId) {
+  // With `startEmpty` (Settings > Running queries, feedback #1111) and no `wsId`, a new
+  // workspace opens instead, and the last one is returned as `previousId` when it has
+  // SQL, for Reopen last panels. Returns { restoredIds, previousId }: the query IDs shown
+  // from an earlier visit (empty when a new workspace opened).
+  async function restore(wsId, { startEmpty = false } = {}) {
     let id = wsId
     if (!id) {
       const last = await storageGet(LAST_WORKSPACE_KEY)
       id = last && !(await isClaimedElsewhere(last)) ? last : null
     }
-    const data = id ? await storageGet(id) : null
+    let data = id ? await storageGet(id) : null
+    let previousId = null
+    if (startEmpty && !wsId && data?.panels?.length) {
+      if (await hasSql(data.panels)) previousId = id
+      data = null
+    }
+    if (workspaceId.value && workspaceId.value !== id) release(workspaceId.value)
     if (data?.panels?.length) {
       workspaceId.value = id
       layoutRows.value = data.layout?.rows ?? 1
@@ -121,6 +131,17 @@ export function useWorkspace() {
     }
     claim(workspaceId.value)
     chrome.storage.local.set({ [LAST_WORKSPACE_KEY]: workspaceId.value })
+    // Only panels with SQL count as shown from last time (empty ones tell nothing).
+    const shown = data?.panels?.length && await hasSql(data.panels)
+    return { restoredIds: shown ? panels.value.map(p => p.queryId) : [], previousId }
+  }
+
+  async function hasSql(list) {
+    for (const p of list) {
+      const rec = await storageGet(p.queryId)
+      if ((rec?.queryText || '').trim()) return true
+    }
+    return false
   }
 
   // Opens a saved query (`id`) or new SQL (`sql`) in this workspace: an empty panel

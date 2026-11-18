@@ -2,6 +2,12 @@
 
 All notable changes to Marketing Cloud Toolkit. Versions 2.0.0 and later are published to the Chrome Web Store as updates to the former SFMC Query Saver listing (1.x). Entries before 2.0.18 are the GitHub release notes, unchanged; "Checked headless" notes describe testing at the time.
 
+## Unreleased
+
+**Changed:**
+- Run Query opens with your last panels or one empty panel (Settings > Running queries); by default it learns which from what you do first after it opens, and Reopen last panels brings the old ones back (feedback #1111). Start fresh is now the first button in the toolbar (feedback #1113).
+- Feedback: a question needs an email, since it cannot be answered otherwise (feedback #1112); I like it opens the Chrome Web Store review page, where reviews are public (feedback #1114).
+
 ## 2.0.23 (2026-11-12)
 
 No permission changes since 2.0.22. **First feature that changes SFMC data:** Remove contacts from a journey (below). Administrators can turn it off with the new policy `disableJourneyWrites`; the privacy policy says so.

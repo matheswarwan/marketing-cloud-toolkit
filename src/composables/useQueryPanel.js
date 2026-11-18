@@ -11,6 +11,7 @@ import { isAutoName, suggestQueryName } from '../utils/queryNames.js'
 import { directReadPlan, readDirect, projectRow } from '../utils/directRead.js'
 import { addOffsetToOrderBy } from '../utils/sqlLint.js'
 import { showToast } from './useToast.js'
+import { choiceForRun, noteChoice, changeNotice } from '../utils/runQueryStart.js'
 import {
   fetchDEMetadata, fetchDEFields, buildDEFields,
   createTargetDE, createQueryActivity,
@@ -606,6 +607,9 @@ export function useQueryPanel(options) {
 
   async function runQuery(fromStep = 0, opts = {}) {
     if (isRunning.value) return
+    // Feedback #1111: the first run after Run Query opens tells which start the user wants.
+    const startChoice = choiceForRun(unref(queryId))
+    if (startChoice) noteChoice(startChoice).then((r) => { if (r) showToast(changeNotice(r.changedTo), 9000) })
     if (fromStep <= 0 || !runText) {
       runText = typeof opts?.sql === 'string' && opts.sql.trim() ? opts.sql : queryText.value
       runEditorText = typeof opts?.editorText === 'string' ? opts.editorText : null

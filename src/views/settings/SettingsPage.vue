@@ -28,6 +28,8 @@ import { SHARE_SETTING } from '@/utils/share.js'
 import { QUERY_STUDIO_SETTING, QUERY_STUDIO_PERMISSION } from '@/utils/queryStudio.js'
 import { NOTIFY_KEY } from '@/utils/watches.js'
 import { ACTIVITY_SAVER_SETTING, ACTIVITY_MAX_SETTING, DEFAULT_MAX_VERSIONS } from '@/utils/activityVersions.js'
+import { STORE_REVIEWS_URL } from '@/utils/storeLinks.js'
+import { START_SETTING, CHOICES_KEY, parseStartSetting, cleanChoices, effectiveStart } from '@/utils/runQueryStart.js'
 
 const { currentTheme, themes, setTheme } = useTheme()
 
@@ -45,6 +47,15 @@ function setActivityMax(e) {
 const { value: emailDebounce } = useStoredSetting('_emailSaveDebounce', 5,
   (v) => (typeof v === 'number' && v >= 0 ? v : 5))
 const { value: reuseQueryDE } = useStoredSetting('_reuseQueryDE', false, (v) => v === true)
+// What Run Query opens with (feedback #1111): learned from use unless picked here.
+const { value: runQueryStart } = useStoredSetting(START_SETTING, 'auto', parseStartSetting)
+const { value: runQueryChoices } = useStoredSetting(CHOICES_KEY, [], cleanChoices)
+const learnedStart = computed(() => effectiveStart('auto', runQueryChoices.value))
+const START_OPTIONS = [
+  { id: 'auto', label: 'Learn from what I do' },
+  { id: 'last', label: 'My last panels' },
+  { id: 'empty', label: 'One empty panel' },
+]
 const { value: autoStartSessions } = useStoredSetting('_autoStartSessions', true, (v) => v !== false)
 const { value: preloadOnConnect } = useStoredSetting('_preloadOnConnect', false, (v) => v === true)
 const { value: automationPanel } = useStoredSetting('_automationPanel', true, (v) => v !== false)
@@ -253,6 +264,19 @@ function setDebounce(e) {
         </div>
         <Switch :model-value="keepHistory && !policy.disableHistory" :disabled="policy.disableHistory" aria-label="Keep query history" @update:model-value="keepHistory = $event" />
       </div>
+      <div class="flex items-start gap-3" data-testid="run-query-start">
+        <div class="flex-1">
+          <div class="text-sm font-medium">When Run Query opens, show</div>
+          <p class="text-xs text-muted-foreground">Your last panels, or one empty panel (the queries stay in Saved queries either way). Learn from what I do watches what you do first after Run Query opens: Start fresh, or running the query shown. When you mostly start fresh it opens empty, and says so; Reopen last panels brings the old ones back.</p>
+          <p v-if="runQueryStart === 'auto'" class="text-xs text-muted-foreground mt-1">Now: {{ learnedStart === 'empty' ? 'one empty panel' : 'your last panels' }} ({{ runQueryChoices.length }} of the last 10 openings counted).</p>
+          <div class="mt-2 inline-flex items-center p-[3px] border border-border rounded-full bg-card" role="radiogroup" aria-label="When Run Query opens">
+            <button v-for="o in START_OPTIONS" :key="o.id" type="button" role="radio" :aria-checked="runQueryStart === o.id"
+              class="h-7 px-3 rounded-full text-xs"
+              :class="runQueryStart === o.id ? 'bg-primary text-primary-foreground font-semibold' : 'text-foreground/80 hover:bg-accent'"
+              @click="runQueryStart = o.id">{{ o.label }}</button>
+          </div>
+        </div>
+      </div>
       <div class="flex items-start gap-3">
         <div class="flex-1">
           <div class="text-sm font-medium">Reuse the data extension and Query Activity</div>
@@ -449,6 +473,7 @@ function setDebounce(e) {
         <RouterLink to="/features" class="h-8 px-3 inline-flex items-center rounded-md border border-border text-xs hover:bg-accent">Features</RouterLink>
         <a href="privacy.html" target="_blank" rel="noopener" class="h-8 px-3 inline-flex items-center rounded-md border border-border text-xs hover:bg-accent">Privacy policy</a>
         <button v-if="!policy.disableFeedback" class="h-8 px-3 rounded-md border border-border text-xs hover:bg-accent" @click="showFeedback = true">Send feedback</button>
+        <a :href="STORE_REVIEWS_URL" target="_blank" rel="noopener" class="h-8 px-3 inline-flex items-center rounded-md border border-border text-xs hover:bg-accent">Write a review</a>
       </div>
     </section>
 
