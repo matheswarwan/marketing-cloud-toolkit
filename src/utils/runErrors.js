@@ -143,12 +143,39 @@ function scanSql(sql) {
  * { cause, fix, sqlHints } for an error message (and the SQL that ran), or null when
  * there is nothing useful to add.
  */
+// Contact Builder attribute sets and Email Studio lists people take for tables (#1105).
+// Query Studio only reads data extensions and data views, so these names never resolve.
+const ATTRIBUTE_SETS = new Set(['contact', 'contacts', 'email', 'emails', 'email addresses', 'email address',
+  'email demographics', 'contact point email', 'subscriber', 'subscribers', 'all subscribers',
+  'mobileconnect demographics', 'mobile connect demographics', 'mobilepush demographics', 'push demographics',
+  'mobile subscriptions', 'sms subscriptions', 'channel address', 'person', 'individual'])
+
+/** Unknown table names in the error that are attribute set names, as written. */
+export function attributeSetNames(message) {
+  const out = []
+  const re = /\[([^\]]+)\] is not a known data extension|invalid object name '([^']+)'/gi
+  let m
+  while ((m = re.exec(String(message || '')))) {
+    const name = (m[1] || m[2] || '').replace(/^ENT\./i, '').replace(/^\[|\]$/g, '')
+    if (ATTRIBUTE_SETS.has(name.trim().toLowerCase()) && !out.includes(name)) out.push(name)
+  }
+  return out
+}
+
+function setsCause(names) {
+  const list = names.map((n) => `[${n}]`).join(' and ')
+  return `${list} ${names.length > 1 ? 'are Contact Builder attribute set names' : 'is a Contact Builder attribute set name'}, not a table. Query Studio and query activities read only data extensions and data views; attribute sets like Contact, Email Addresses and Email Demographics are not queryable.`
+}
+const SETS_FIX = 'For email addresses and subscriber status use the data view _Subscribers (ENT._Subscribers from a child BU), joined to your data on SubscriberKey. For your own attributes, query the data extension behind the attribute set (Data > Data model shows which one, and Query this set writes the SQL).'
+
 export function explainRunError(message, sql = '') {
   const text = String(message || '')
   if (!text || /SESSION_EXPIRED|Cannot find table 0/i.test(text)) return null
   const rule = RULES.find((r) => r.test.test(text))
   const vague = !rule && /system error|unknown error|an error (has )?occurred|failed|error/i.test(text)
   const sqlHints = rule || vague ? scanSql(sql) : []
+  const sets = rule && attributeSetNames(text)
+  if (sets && sets.length) return { cause: setsCause(sets), fix: SETS_FIX, sqlHints }
   if (rule) return { cause: rule.cause, fix: rule.fix, sqlHints }
   if (vague && sqlHints.length) {
     return { cause: 'SFMC gave no reason. These parts of the SQL often fail a run:', fix: '', sqlHints }

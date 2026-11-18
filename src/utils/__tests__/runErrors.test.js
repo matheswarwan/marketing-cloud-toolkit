@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { explainRunError } from '../runErrors.js'
+import { attributeSetNames, explainRunError } from '../runErrors.js'
 
 describe('Explain the run error', () => {
   it('matches SFMC messages to a cause and fix', () => {
@@ -33,5 +33,20 @@ describe('ntext errors (feedback #1085)', () => {
   it('explains sorting and = on ntext', () => {
     expect(explainRunError('The text, ntext, and image data types cannot be compared or sorted, except when using IS NULL or LIKE operator.').fix).toMatch(/CAST/)
     expect(explainRunError('The data types ntext and varchar are incompatible in the equal to operator.').fix).toMatch(/CAST/)
+  })
+})
+
+describe('attribute set names used as tables (feedback #1105)', () => {
+  const msg = 'An error occurred while checking the query syntax. Errors: [Contact] is not a known data extension or system data view. You can only query existing data extensions or system data views. [Email] is not a known data extension or system data view.'
+  it('says Contact and Email are attribute sets and points to _Subscribers', () => {
+    expect(attributeSetNames(msg)).toEqual(['Contact', 'Email'])
+    const r = explainRunError(msg)
+    expect(r.cause).toMatch(/\[Contact\] and \[Email\] are Contact Builder attribute set names/)
+    expect(r.fix).toMatch(/_Subscribers/)
+  })
+  it('keeps the general advice for other unknown names', () => {
+    const r = explainRunError('[My_DE] is not a known data extension or system data view.')
+    expect(r.cause).toMatch(/data extension name is wrong/)
+    expect(attributeSetNames("Invalid object name 'Email Addresses'.")).toEqual(['Email Addresses'])
   })
 })
