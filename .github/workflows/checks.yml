@@ -39,11 +39,12 @@ jobs:
       - run: npm run build
       - name: Manifest guard (permissions, hosts, content scripts, CSP, network hosts in source)
         run: node scripts/manifest-guard.mjs
+      # Fails on moderate or worse, except the reviewed advisories in osv-scanner.toml.
       - name: npm audit (extension)
-        run: npm audit --audit-level=moderate
+        run: node scripts/audit.mjs
       - name: npm audit (share worker)
         working-directory: workers/share
-        run: npm audit --audit-level=moderate
+        run: node ../../scripts/audit.mjs
       - name: retire.js on the built package
         run: npx --yes retire@${RETIRE_VERSION} --path dist --exitwith 1
 
@@ -64,18 +65,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # xlsx 0.20.3 comes from SheetJS's CDN and has the fixes for these two advisories;
-      # OSV lists every version as affected (docs/security-summary.md, Supply chain).
-      - run: |
-          cat > osv-scanner.toml <<'TOML'
-          [[IgnoredVulns]]
-          id = "GHSA-4r6h-8v6p-xvw6"
-          reason = "xlsx 0.20.3 from cdn.sheetjs.com includes the fix (0.19.3); OSV marks all versions"
-          [[IgnoredVulns]]
-          id = "GHSA-5pgg-2g8v-p4x9"
-          reason = "xlsx 0.20.3 from cdn.sheetjs.com includes the fix (0.20.2); OSV marks all versions"
-          TOML
-          docker run --rm -v "$PWD:/src:ro" -v "$PWD/osv-scanner.toml:/osv-scanner.toml:ro" "$OSV_IMAGE" scan source --config /osv-scanner.toml -r /src
+      # Reviewed advisories (xlsx from SheetJS's CDN, picomatch in build tools only) are listed with
+      # their reasons in osv-scanner.toml (docs/security-summary.md, Supply chain).
+      - run: docker run --rm -v "$PWD:/src:ro" "$OSV_IMAGE" scan source --config /src/osv-scanner.toml -r /src
 
   semgrep:
     name: semgrep
