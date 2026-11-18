@@ -15,8 +15,12 @@ import { eventAutomationId } from '../journeyApi.js'
 import { primaryVersion } from '../journeys.js'
 import {
   norm, matchQuery, matchField, tablesInSql, codeRefsToDE, mentionsName, contentBlockRefs, assetText, assetPlacesBlock,
-  findValues, findPathMentions, collectProfileRefs, lineageEdges, lineageTree, deRefsInCode,
+  findValues, findPathMentions, collectProfileRefs, lineageEdges, lineageTree, deRefsInCode, settleUnqualified,
 } from './match.js'
+import { resolveTableForBuilder } from '../builderImport.js'
+import { DATA_VIEWS } from '../dataViews.js'
+
+const DATA_VIEWS_UPPER = new Set([...DATA_VIEWS].map((n) => n.toUpperCase()))
 
 const AS = (stack) => `https://mc.${stack}.marketingcloudapps.com/AutomationStudioFuel3/fuelapi`
 const label = (id) => SOURCES[id]?.label || id
@@ -268,18 +272,46 @@ async function withMap(ctx, de, sections, edges, lists) {
 }
 
 // ── One field of a DE ─────────────────────────────────────
+// The field names of the other tables these queries read, by lower-case table name (null
+// when not found). At most MAX_FIELD_TABLES tables, 5 lookups at a time.
+const MAX_FIELD_TABLES = 40
+async function tableFields(ctx, queries, de) {
+  const tables = new Map()
+  for (const q of queries) for (const t of tablesInSql(q.queryText)) if (norm(t.name) !== norm(de.name) && !tables.has(norm(t.name))) tables.set(norm(t.name), t)
+  const out = new Map()
+  const list = [...tables.values()].slice(0, MAX_FIELD_TABLES)
+  await runInBatches(list, 5, async (t) => {
+    const r = await resolveTableForBuilder(ctx.stack, { name: t.name, ent: t.ent, dataView: /^_/.test(t.name) && DATA_VIEWS_UPPER.has(t.name.toUpperCase()) }).catch(() => null)
+    // No fields read (lookup failed or refused) counts as not checked: every DE has at least one.
+    const names = (r?.fields || []).map((f) => f.name).filter(Boolean)
+    out.set(norm(t.name), names.length ? names : null)
+  }, { shouldStop: ctx.stop })
+  return out
+}
 async function analyseField(target, ctx) {
   const { de, field } = target
   const sections = []
   const queries = await ctx.get('queries')
   const items = []
+  const found = []
   for (const q of queries?.items || []) {
     const m = matchField(q, de, field)
-    if (!m) continue
+    if (m) found.push({ q, m })
+  }
+  // Unqualified in a query with several tables (feedback #1106): read the other tables'
+  // fields; when none of them has this field, the query reads it from this DE.
+  const maybes = found.filter((x) => x.m.reads === 'maybe')
+  if (maybes.length) {
+    const fields = await tableFields(ctx, maybes.map((x) => x.q), de)
+    for (const x of maybes) Object.assign(x.m, settleUnqualified(x.q, de, field, (t) => fields.get(norm(t.name)) || null))
+  }
+  for (const { q, m } of found) {
     items.push(activityItem(ctx.stack, 300, q, {
       badges: [
         ...(m.writes ? [{ text: 'Writes', tone: 'write' }] : []),
-        ...(m.reads === 'yes' ? [{ text: 'Reads', tone: 'read' }] : m.reads === 'maybe' ? [{ text: 'Maybe reads (unqualified)', tone: 'maybe' }] : m.reads === 'all' ? [{ text: 'Reads (SELECT *)', tone: 'read' }] : []),
+        ...(m.reads === 'yes' ? [{ text: m.why === 'only' ? 'Reads (unqualified; no other table has this field)' : 'Reads', tone: 'read' }]
+          : m.reads === 'maybe' ? [{ text: m.why === 'shared' ? `Maybe reads (unqualified; ${m.table} has this field too)` : 'Maybe reads (unqualified)', tone: 'maybe' }]
+          : m.reads === 'all' ? [{ text: 'Reads (SELECT *)', tone: 'read' }] : []),
       ],
       lines: [q.targetName && !m.writes ? `Target: ${q.targetName}` : '', modified(q.modifiedDate)].filter(Boolean),
       code: { text: q.queryText || '', lang: 'sql' },

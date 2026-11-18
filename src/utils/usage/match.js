@@ -109,6 +109,25 @@ export function matchField(q, de, field) {
   return { writes, reads }
 }
 
+/**
+ * Settles a 'maybe' from matchField (feedback #1106): an unqualified column in a query
+ * that reads several tables belongs to this DE when no other table of the query has a
+ * field of that name. `fieldsOf(table)` gives `{ name, ent }`'s field names, or null when
+ * the table could not be looked up (a CTE or derived table name, a missing DE). Returns
+ * 'yes' when settled, else 'maybe' with `why`: 'shared' (another table has the field too)
+ * or 'unknown' (a table could not be checked).
+ */
+export function settleUnqualified(q, de, field, fieldsOf) {
+  const others = tablesInSql(q.queryText).filter((t) => norm(t.name) !== norm(de.name))
+  let unknown = false
+  for (const t of others) {
+    const names = fieldsOf(t)
+    if (!names) { unknown = true; continue }
+    if (names.some((n) => norm(n) === norm(field))) return { reads: 'maybe', why: 'shared', table: t.name }
+  }
+  return unknown ? { reads: 'maybe', why: 'unknown' } : { reads: 'yes', why: 'only' }
+}
+
 // ── AMPscript and SSJS ────────────────────────────────────
 const AMP_DE_FN = /\b(Lookup|LookupRows|LookupRowsCS|LookupOrderedRows|LookupOrderedRowsCS|UpsertData|UpsertDE|InsertData|InsertDE|UpdateData|UpdateDE|DeleteData|DeleteDE|ClaimRow|ClaimRowValue|DataExtensionRowCount)\s*\(\s*(["'])([^"']+)\2([^)]*)\)?/gi
 const SSJS_INIT = /\bDataExtension\.Init\s*\(\s*(["'])([^"']+)\1/gi

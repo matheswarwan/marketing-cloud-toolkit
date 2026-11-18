@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  tablesInSql, matchQuery, matchField, buildActivityIndex, deRefsInCode, codeRefsToDE, contentBlockRefs, assetText,
+  tablesInSql, matchQuery, matchField, settleUnqualified, buildActivityIndex, deRefsInCode, codeRefsToDE, contentBlockRefs, assetText,
   assetPlacesBlock, findValues, findPathMentions, collectProfileRefs, lineageEdges, lineageTree,
 } from '../usage/match.js'
 
@@ -168,6 +168,23 @@ describe('lineage', () => {
   })
 })
 
+
+describe('settleUnqualified (feedback #1106)', () => {
+  const de = { id: 'D', name: 'Orders', customerKey: 'ORD' }
+  const q = { queryText: 'SELECT Amount FROM Orders o JOIN Customers c ON c.Id = o.CustId JOIN _Sent s ON s.SubscriberKey = c.Id' }
+  it('settles to yes when no other table has the field', () => {
+    const fields = { customers: ['Id', 'Email'], _sent: ['SubscriberKey', 'JobID'] }
+    expect(settleUnqualified(q, de, 'amount', (t) => fields[t.name.toLowerCase()] || null)).toEqual({ reads: 'yes', why: 'only' })
+  })
+  it('stays maybe when another table has a field of that name, and names it', () => {
+    const fields = { customers: ['Id', 'AMOUNT'], _sent: ['JobID'] }
+    expect(settleUnqualified(q, de, 'Amount', (t) => fields[t.name.toLowerCase()] || null)).toEqual({ reads: 'maybe', why: 'shared', table: 'Customers' })
+  })
+  it('stays maybe when a table could not be checked (a CTE, a missing DE)', () => {
+    expect(settleUnqualified(q, de, 'Amount', (t) => (t.name === 'Customers' ? ['Id'] : null))).toEqual({ reads: 'maybe', why: 'unknown' })
+  })
+})
+
 // ── The engine against a fake SFMC ─────────────────────────
 function stub(handler) {
   const calls = []
@@ -282,6 +299,34 @@ describe('findUsage', () => {
     expect(fm.edges.find((e) => e.source === r.map.focus.id && e.target === 'act:300:Q2')).toMatchObject({ rel: 'reads' })
     expect(titles(r, 'journeys')).toEqual(['Welcome'])
     expect(titles(r, 'content')).toEqual(['Receipt'])
+  })
+
+  it('settles unqualified field reads with the other tables\' fields (feedback #1106)', async () => {
+    const extra = [
+      { queryDefinitionId: 'Q5', name: 'Unqualified, only Orders has it', targetKey: 'R1', targetName: 'R1', queryText: 'SELECT Amount, c.Email FROM Orders o JOIN Customers c ON c.Id = o.CustId' },
+      { queryDefinitionId: 'Q6', name: 'Unqualified, Refunds has it too', targetKey: 'R2', targetName: 'R2', queryText: 'SELECT Amount FROM Orders o JOIN Refunds r ON r.Id = o.Id' },
+      { queryDefinitionId: 'Q7', name: 'Unqualified, CTE', targetKey: 'R3', targetName: 'R3', queryText: 'WITH x AS (SELECT Id FROM Other) SELECT Amount FROM Orders o JOIN x ON x.Id = o.Id' },
+    ]
+    const calls = stub((url, body) => {
+      if (url.includes('/automation/v1/queries/?')) return { count: 7, items: [...QUERIES, ...extra].map((q) => ({ ...q })) }
+      const name = decodeURIComponent((url.match(/[?&]name=([^&]+)/) || [])[1] || '').replace(/%/g, '')
+      if (url.includes('customobjects/category/0') && name) {
+        const known = { Customers: 'C1', Refunds: 'RF1' }
+        return { items: known[name] ? [{ id: known[name], name }] : [] }
+      }
+      if (/customobjects\/C1\/fields/.test(url)) return { fields: [{ name: 'Id' }, { name: 'Email' }] }
+      if (/customobjects\/RF1\/fields/.test(url)) return { fields: [{ name: 'Id' }, { name: 'Amount' }] }
+      return sfmc(url, body)
+    })
+    const { findUsage } = await load()
+    const r = await findUsage('s7', { kind: 'field', de, field: 'Amount' })
+    const badges = Object.fromEntries(r.sections.find((s) => s.id === 'queries').items.map((i) => [i.title, i.badges.map((b) => b.text).join(', ')]))
+    expect(badges['Unqualified, only Orders has it']).toBe('Reads (unqualified; no other table has this field)')
+    expect(badges['Unqualified, Refunds has it too']).toBe('Maybe reads (unqualified; Refunds has this field too)')
+    expect(badges['Unqualified, CTE']).toBe('Maybe reads (unqualified)')
+    expect(badges['Use orders']).toBe('Reads')
+    // Each other table is looked up once.
+    expect(calls.filter((c) => /customobjects\/C1\/fields/.test(c))).toHaveLength(1)
   })
 
   it('finds the automations an activity runs in', async () => {
