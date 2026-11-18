@@ -136,6 +136,8 @@ Set through Chrome policy for the extension (schema `public/managed_schema.json`
 
 - Dependencies are locked in `package-lock.json`. `npm audit` reports 0 known vulnerabilities (2026-10-28).
 - `xlsx` comes from SheetJS's own CDN at 0.20.3, which has the fixes for GHSA-4r6h-8v6p-xvw6 and GHSA-5pgg-2g8v-p4x9; scanners that compare it with the npm registry still list those advisories by name.
+- `picomatch` (GHSA-fc5q-39xc-vjpf, ReDoS, no fixed version yet) comes only through the build tools vite and vitest and is not in the extension zip. Reviewed 2026-11-18 and skipped by the checks until 2027-02-18, or until a fixed version ships.
+- Reviewed advisories and their reasons are in `osv-scanner.toml`; `scripts/audit.mjs` applies the same list to `npm audit` (moderate and worse fail).
 - Scan results and self-assessments: `security/audits/`.
 
 ## Automated checks

@@ -1,0 +1,20 @@
+# Reviewed advisories, read by osv-scanner (Checks) and by scripts/audit.mjs (npm audit).
+# Reasons: docs/security-summary.md, Supply chain.
+
+# xlsx 0.20.3 comes from SheetJS's own CDN (https://cdn.sheetjs.com) and has both fixes; OSV and
+# npm compare it with the npm registry copy, which stopped at 0.18.5, so every version is listed.
+[[IgnoredVulns]]
+id = "GHSA-4r6h-8v6p-xvw6"
+reason = "xlsx 0.20.3 from cdn.sheetjs.com includes the fix (0.19.3); OSV marks all versions"
+
+[[IgnoredVulns]]
+id = "GHSA-5pgg-2g8v-p4x9"
+reason = "xlsx 0.20.3 from cdn.sheetjs.com includes the fix (0.20.2); OSV marks all versions"
+
+# Reviewed 2026-11-18. picomatch has no fixed version yet (every version up to 4.0.7). It comes
+# only through the build tools (vite, vitest, on the developer's own file patterns) and is not in
+# the extension zip. Remove this entry when picomatch ships a fix (Dependabot will raise it).
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2027-02-18
+reason = "ReDoS in picomatch, build tools only (vite, vitest), not shipped in the extension; no fixed version yet."
