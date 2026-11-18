@@ -4,10 +4,11 @@
 // results in sections. Mounted once in App.vue.
 // On the Where used page (route /where-used) the page shows it inline (`embedded`), so
 // the floating copy from App.vue stays hidden there.
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   X, RefreshCw, Loader2, Check, AlertCircle, Square, Play, ChevronDown, ChevronRight, Network, ArrowLeft, Minus,
+  Maximize2, Minimize2, ExternalLink,
   FileCode, ArrowDownToLine, ArrowUpFromLine, Filter, Braces, Send, Zap, Route as RouteIcon, LayoutTemplate, Database, Workflow, List, GitBranch, Waypoints,
 } from 'lucide-vue-next'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
@@ -18,7 +19,8 @@ import UsageMap from './UsageMap.vue'
 import { buildUsageMap } from '@/utils/usage/graph.js'
 import { layoutUsageMap } from '@/utils/usage/graphLayout.js'
 import { usageMapSvg } from '@/utils/usage/graphSvg.js'
-import { useUsage, targetTitle, targetKindLabel } from '@/composables/useUsage.js'
+import { useUsage, targetTitle, targetKindLabel, targetLink } from '@/composables/useUsage.js'
+import { openTab } from '@/utils/openTab.js'
 import AiButton from '@/components/ai/AiButton.vue'
 import AskAiDialog from '@/components/ai/AskAiDialog.vue'
 import { useAi } from '@/composables/useAi.js'
@@ -26,11 +28,12 @@ import { AI_TEXT_SYSTEM, buildAiTaskPrompt, docText } from '@/utils/aiAssist.js'
 
 const props = defineProps({
   embedded: { type: Boolean, default: false }, // shown inside the Where used page
+  standalone: { type: Boolean, default: false }, // the page of its own (#/where-used/result): no Close
 })
 const router = useRouter()
 const route = useRoute()
 const { state, start, stop, follow, back, progress, toggleSkip, canSkip, again } = useUsage()
-const onPage = computed(() => route?.path === '/where-used')
+const onPage = computed(() => String(route?.path || '').startsWith('/where-used'))
 const shown = computed(() => state.open && state.target && (props.embedded || !onPage.value))
 const skipped = (id) => state.skip.includes(id)
 // A finished check that left out a source the user has ticked again since.
@@ -51,6 +54,16 @@ const scanSub = computed(() => {
   return steps
 })
 function resume() { again() }
+// Full screen and Open in new tab (user, 2026-11-18). Full screen covers the window (Esc or
+// the button again leaves it); the map refits itself to the new size.
+const full = ref(false)
+const onKey = (e) => { if (e.key === 'Escape' && full.value) { e.stopPropagation(); full.value = false } }
+watch(full, (on) => { if (on) window.addEventListener('keydown', onKey, true); else window.removeEventListener('keydown', onKey, true) })
+watch(shown, (on) => { if (!on) full.value = false })
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true))
+function openInTab() {
+  openTab({ url: chrome.runtime.getURL(`app.html${targetLink(state.stack, state.target)}`) })
+}
 const sections = computed(() => state.result?.sections || [])
 const total = computed(() => sections.value.reduce((n, s) => n + (s.items?.length || 0), 0))
 const title = computed(() => state.result?.title || targetTitle(state.target))
@@ -169,7 +182,9 @@ function buildDoc() {
 <template>
   <aside v-if="shown" aria-labelledby="usage-title"
     :role="embedded ? undefined : 'dialog'"
-    :class="embedded
+    :class="full
+      ? 'fixed inset-0 z-[130] flex flex-col bg-card text-foreground'
+      : embedded
       ? 'h-full min-h-0 flex flex-col bg-card text-foreground'
       : 'fixed top-12 bottom-0 right-0 z-110 w-full sm:w-[600px] flex flex-col border-l border-border bg-card text-foreground shadow-2xl'">
     <header class="flex flex-col gap-1.5 px-5 py-4 border-b border-border">
@@ -182,8 +197,16 @@ function buildDoc() {
             <h2 id="usage-title" class="text-[17px] font-bold leading-snug break-words">{{ title }}</h2>
           </div>
         </div>
-        <button class="h-[34px] w-[34px] shrink-0 flex items-center justify-center rounded-full border border-border bg-card hover:bg-accent"
-          :title="state.running ? 'Close (the scan keeps going)' : 'Close'" aria-label="Close" @click="state.open = false"><X class="h-4 w-4" /></button>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button v-if="!standalone" class="h-[34px] w-[34px] flex items-center justify-center rounded-full border border-border bg-card hover:bg-accent"
+            title="Open in a new tab" aria-label="Open in a new tab" data-usage-newtab @click="openInTab"><ExternalLink class="h-4 w-4" /></button>
+          <button class="h-[34px] w-[34px] flex items-center justify-center rounded-full border border-border bg-card hover:bg-accent"
+            :title="full ? 'Leave full screen (Esc)' : 'Full screen'" :aria-label="full ? 'Leave full screen' : 'Full screen'" :aria-pressed="full" data-usage-full @click="full = !full">
+            <Minimize2 v-if="full" class="h-4 w-4" /><Maximize2 v-else class="h-4 w-4" />
+          </button>
+          <button v-if="!standalone" class="h-[34px] w-[34px] flex items-center justify-center rounded-full border border-border bg-card hover:bg-accent"
+            :title="state.running ? 'Close (the scan keeps going)' : 'Close'" aria-label="Close" @click="state.open = false; full = false"><X class="h-4 w-4" /></button>
+        </div>
       </div>
       <span v-if="state.target.de?.customerKey" class="text-xs text-muted-foreground">Key <code class="font-mono text-[11px]">{{ state.target.de.customerKey }}</code></span>
     </header>

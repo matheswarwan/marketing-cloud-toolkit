@@ -29,6 +29,24 @@ export function targetKey(t) {
   return `${t.kind}:${String(id).toLowerCase()}:${t.field || ''}`
 }
 
+/**
+ * The address of a check on a page of its own (Open in new tab): `#/where-used/result` with the
+ * stack and the target as JSON. The new tab runs the check again; what Where used saved for
+ * this business unit is reused, so only changes are read.
+ */
+export function targetLink(stack, target) {
+  const q = new URLSearchParams({ stack: stack || '', t: JSON.stringify(target || {}) })
+  return `#/where-used/result?${q}`
+}
+/** `{ stack, target }` from that address's query, or null when it does not name a known check. */
+export function targetFromQuery(query = {}) {
+  try {
+    const target = JSON.parse(String(query.t || ''))
+    if (!target || !KINDS[target.kind] || !query.stack) return null
+    return { stack: String(query.stack), target }
+  } catch { return null }
+}
+
 export const targetTitle = (t) => (t ? KINDS[t.kind].title(t) : '')
 export const targetKindLabel = (t) => (t ? (t.de?.dataView ? 'Data view' : KINDS[t.kind].label) : '')
 

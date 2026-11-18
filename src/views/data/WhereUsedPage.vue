@@ -78,6 +78,8 @@ async function search() {
           key: de.id, title: de.name, code: de.customerKey, badge: de.sourceType ? (de.sourceType === 'shared' ? 'Shared' : 'Synchronized') : '', sub: formatDateTime(de.modifiedDate),
           ...(kind.value === 'de' ? { target: { kind: 'de', de } } : { pick: de }),
         }))
+        // Field: data view fields too (their lists are known), before the DEs (live s10, #1106).
+        if (kind.value === 'field' && q.trim()) out = [...[...DATA_VIEWS].filter((n) => contains(n, q)).sort().map((name) => ({ key: name, title: name, badge: 'Data view', sub: '', pick: { name, dataView: true } })), ...out]
       } else if (kind.value === 'dataview') {
         out = [...DATA_VIEWS].filter((n) => contains(n, q)).sort().map((name) => ({ key: name, title: name, sub: '', pick: { name, dataView: true } }))
       } else if (kind.value === 'activity') {

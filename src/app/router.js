@@ -62,6 +62,12 @@ export const routes = [
     ...(item.props ? { props: item.props } : {}),
     meta: { title: item.name, group: item.group },
   })),
+  // One Where used check on a page of its own, full width (user, 2026-11-18).
+  {
+    path: '/where-used/result',
+    component: () => import('../views/data/WhereUsedResultPage.vue'),
+    meta: { title: 'Where used', group: 'Data' },
+  },
   // Preview data as a page (feedback #1097).
   {
     path: '/data-extensions/preview',

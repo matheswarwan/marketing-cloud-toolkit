@@ -92,6 +92,14 @@ describe('matchField', () => {
     expect(matchField({ targetKey: 'X', queryText: 'SELECT [Amount] FROM [Orders]' }, de, 'Amount')?.reads).toBe('yes')
     expect(matchField({ targetKey: 'X', queryText: 'SELECT * FROM Orders' }, de, 'Amount')?.reads).toBe('all')
   })
+  it('does not count an output name after AS as a read (live s10, #1106)', () => {
+    const sql = 'SELECT DE1.DateOfSent AS DateOfSent, DE2.RegistrationDate AS RegistrationDate FROM [Entry DE] AS DE1 JOIN [Orders] AS DE2 ON DE1.Id = DE2.Id'
+    expect(matchField({ targetKey: 'X', queryText: sql }, de, 'DateOfSent')).toBeNull()
+    expect(matchField({ targetKey: 'X', queryText: sql }, de, 'RegistrationDate')).toEqual({ writes: false, reads: 'yes' })
+    // A bare read elsewhere in the query still counts.
+    expect(matchField({ targetKey: 'X', queryText: 'SELECT DE1.Id AS Amount FROM [Entry DE] DE1 JOIN Orders o ON o.Id = DE1.Id WHERE Amount > 5' }, de, 'Amount')?.reads).toBe('maybe')
+    expect(matchField({ targetKey: 'X', queryText: 'SELECT CAST(Amount AS VARCHAR) AS A FROM Orders' }, de, 'Amount')?.reads).toBe('yes')
+  })
   it('writes when the query targets the DE and selects the column', () => {
     expect(matchField({ targetKey: 'ORD', queryText: 'SELECT s.Total AS Amount FROM Staging s' }, de, 'Amount')).toEqual({ writes: true, reads: null })
     expect(matchField({ targetKey: 'ORD', queryText: 'SELECT s.Total FROM Staging s' }, de, 'Amount')).toBeNull()
