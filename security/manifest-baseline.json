@@ -56,6 +56,7 @@
     "*.marketingcloudapps.com",
     "*.salesforce-marketingcloud.com",
     "*.soap.marketingcloudapis.com",
+    "chromewebstore.google.com",
     "cloud-pages.*.marketingcloudapps.com",
     "cloudflare-dns.com",
     "content-builder.*.marketingcloudapps.com",
