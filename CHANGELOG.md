@@ -8,6 +8,9 @@ All notable changes to Marketing Cloud Toolkit. Versions 2.0.0 and later are pub
 - Run Query opens with your last panels or one empty panel (Settings > Running queries); by default it learns which from what you do first after it opens, and Reopen last panels brings the old ones back (feedback #1111). Start fresh is now the first button in the toolbar (feedback #1113).
 - Feedback: a question needs an email, since it cannot be answered otherwise (feedback #1112); I like it opens the Chrome Web Store review page, where reviews are public (feedback #1114).
 
+**Fixed:**
+- SOAP pages (Users and roles, Sends, Subscriber lookup and others) on stacks without a webservice.<stack> address (s11, s12, s13, s50, s51): SOAP goes to the account's own SOAP address from its endpoint list, then the tenant address from the login, then webservice.<stack> (feedback #1102, #1103, #1116).
+
 ## 2.0.23 (2026-11-12)
 
 No permission changes since 2.0.22. **First feature that changes SFMC data:** Remove contacts from a journey (below). Administrators can turn it off with the new policy `disableJourneyWrites`; the privacy policy says so.

@@ -42,10 +42,10 @@ export const TO_TEST = [
         expect: 'Every automation loads, 50 at a time, and Load more disappears at the end. Checked live on s10 (452 automations).',
       },
       {
-        id: '2.0.25-soap-host', area: 'Setup', title: 'SOAP pages on newer stacks', ref: '#1102, #1103', from: 'a user (no name given)', live: true,
-        where: 'Setup > Users and roles; Sending > Sends (on s11, s12, s13, s50 or s51)',
-        steps: ['On an account on one of those stacks, open Users and roles and Sends.'],
-        expect: 'Both load (they said "Failed to fetch"). Chrome asks to accept the new SOAP host permission on update. Only s10 checked live.',
+        id: '2.0.25-soap-host', area: 'Setup', title: 'SOAP pages on newer stacks', ref: '#1102, #1103, #1116', from: 'users (no name given)', live: true,
+        where: 'Setup > Users and roles; Sending > Sends; Contacts > Subscriber lookup (on s11, s12, s13, s50 or s51)',
+        steps: ['On an account on one of those stacks, open Users and roles and Sends, then look up a subscriber.'],
+        expect: 'All three load (they said "Failed to fetch"). Chrome asks to accept the new SOAP host permission on update. If the account endpoint list cannot be read, the tenant SOAP address from the login is tried before webservice.<stack>. Only s10 checked live.',
       },
       {
         id: '2.0.25-login-after-open', area: 'General', title: 'Logging in after the Toolkit was opened', ref: 'user, 2026-11-17', from: 'Mathes', live: false,
