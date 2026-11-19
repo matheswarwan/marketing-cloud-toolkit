@@ -48,6 +48,7 @@ const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref(null)
 const searchedFor = ref(null) // what the list shows: { text, folder }
+const listFolder = ref(null) // folder id the list shows in full (#1119), else null
 const searchAll = ref(false) // search every folder, not only the open one
 
 // Feedback #1069: a search is stored for 30 days. Opening a folder (or the page) shows
@@ -81,6 +82,7 @@ async function runSearch(mode = 'search') {
     pageNo.value = Math.max(1, Math.ceil(r.items.length / EMAIL_PAGE_SIZE))
     listInfo.value = { savedAt: r.savedAt, mode: r.mode, changed: r.changed }
     searchedFor.value = { text: params.text, folder: params.folderId ? currentFolder.value?.name : null }
+    listFolder.value = params.folderId != null && !params.text ? params.folderId : null // tree items (#1119)
   } catch (e) {
     error.value = searchError(e, 'search emails')
   } finally { loading.value = false }
@@ -298,7 +300,7 @@ useRouteSearch('/emails', (q) => { text.value = q; searchAll.value = true; whenS
         <Mail class="h-4 w-4 text-muted-foreground" />
       </div>
       <!-- Folders -->
-      <ContentFolderTree v-show="!focus" ref="tree" v-model="currentFolder" :stack="stack" all-label="All emails" :all-icon="Mail" class="border-r border-border" />
+      <ContentFolderTree v-show="!focus" ref="tree" v-model="currentFolder" :stack="stack" all-label="All emails" :all-icon="Mail" :items="emails" :items-folder="listFolder" :items-total="total" :item-icon="Mail" :active-item="picked?.id" @item="pick" class="border-r border-border" />
 
       <!-- Emails -->
       <section v-show="!focus" class="border-r border-border overflow-y-auto" aria-label="Emails" data-email-list>

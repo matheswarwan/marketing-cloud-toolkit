@@ -15,6 +15,12 @@ vi.mock('@/utils/sfmcApi.js', () => ({
     const start = (page - 1) * size
     return { count: n, items: Array.from({ length: Math.max(0, Math.min(size, n - start)) }, (_, i) => ({ keys: { subscriberkey: `k${start + i}` }, values: { emailaddress: i % 2 ? 'odd@x.co' : 'even@x.co' } })) }
   }),
+  // Contact Builder by ID (#1120): flat items, used first for Synchronized DEs.
+  fetchDERowsById: vi.fn(async (stack, id, page, size) => {
+    fetched.push({ id, page, size })
+    if (fail) throw fail
+    return { count: 3, pageSize: size, items: [{ subscriberkey: 's1', emailaddress: 'a@x.co' }, { subscriberkey: 's2', emailaddress: 'b@x.co' }, { subscriberkey: 's3', emailaddress: 'c@x.co' }] }
+  }),
 }))
 
 const button = (w, t) => w.findAll('button').find((b) => b.text().trim().startsWith(t))
@@ -65,6 +71,17 @@ describe('DE rows viewer (feedback #117)', () => {
     await flushPromises()
     expect(fetched[1]).toEqual({ key: 'SUBS', page: 1, size: 2500 })
     expect(w.text()).toContain('75 of 75 rows loaded')
+  })
+
+  it('reads a Synchronized data extension through Contact Builder by ID (#1120)', async () => {
+    fetched.length = 0
+    const { default: Viewer } = await import('../DERowsViewer.vue')
+    const w = mount(Viewer, { props: { stack: 's13', de: { id: 'sync-1', name: 'Lead_Salesforce', customerKey: 'Lead_Salesforce', sourceType: 'sync' } } })
+    await flushPromises()
+    expect(fetched[0]).toEqual({ id: 'sync-1', page: 1, size: 50 })
+    expect(fetched.some((f) => f.key)).toBe(false)
+    expect(w.text()).toContain('3 of 3 rows')
+    expect(w.text()).toContain('b@x.co')
   })
 
   it('says why a Shared data extension could not be read', async () => {

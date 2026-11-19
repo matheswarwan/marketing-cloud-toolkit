@@ -12,6 +12,24 @@ export const TO_TEST = [
     status: 'Not released: test builds only',
     items: [
       {
+        id: '2.0.25-sync-preview', area: 'Data Extensions', title: 'Preview data of a Synchronized DE', ref: '#1120', from: 'Mathes', live: false,
+        where: 'Data Extensions > Synchronized Data Extensions > Preview data',
+        steps: ['Open Preview data on a Synchronized DE (for example Lead_Salesforce).', 'Load more and Load last 100 rows.', 'Preview a local DE too.'],
+        expect: 'Rows show for the Synchronized DE (read through Contact Builder, as Contact Builder does); paging works; local DEs read as before.',
+      },
+      {
+        id: '2.0.25-folder-scroll', area: 'Shell', title: 'Long folder names scroll sideways', ref: '#1118', live: false,
+        where: 'Content > CloudPages (and every folder tree)',
+        steps: ['Open a deep folder with a long name.'],
+        expect: 'The tree scrolls sideways and shows the whole name; hovering a folder shows its full name.',
+      },
+      {
+        id: '2.0.25-folder-items', area: 'Shell', title: 'Opening a folder lists its sub-folders and items in the tree', ref: '#1119', from: 'Mathes', live: false,
+        where: 'Data Extensions, CloudPages, Emails, Automations, Journeys',
+        steps: ['Open a folder in the tree (no search text).', 'Click an item listed under it.', 'Type a search, then open another folder.'],
+        expect: 'Sub-folders first, then the folder\'s items as the list shows them ("N more in the list" when the list has more); clicking opens the item like the list does; a search or status filter hides the items in the tree.',
+      },
+      {
         id: '2.0.25-run-query-start', area: 'Queries', title: 'What Run Query opens with, learned from use', ref: '#1111', from: 'Foram', live: false,
         where: 'Queries > Run Query; Settings > Running queries > When Run Query opens, show',
         steps: ['With a query in a panel, open a new Toolkit tab on Run Query and click Start fresh. Do this 3 times.', 'Open a new Toolkit tab on Run Query.', 'Click Reopen last panels.', 'In Settings, pick My last panels, then One empty panel, and open Run Query each time.'],
