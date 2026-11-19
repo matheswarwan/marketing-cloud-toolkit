@@ -50,6 +50,7 @@ function afterReorder(de) {
 
 const query = ref('')
 const searched = ref(null) // the query of the results shown, null before any search
+const listFolder = ref(null) // folder id the results list in full (#1119), else null
 const loading = ref(false)
 const loadingMore = ref(false)
 const error = ref('')
@@ -126,6 +127,8 @@ async function search() {
   sharedError.value = ''
   stopAllFields()
   searched.value = query.value.trim()
+  // The tree lists the open folder's DEs (#1119) when this is a plain folder listing.
+  listFolder.value = folder.value && !searched.value ? folder.value.id : null
   local.value = []
   localTotal.value = 0
   localPage.value = 0
@@ -463,7 +466,7 @@ const columns = [
     </div>
 
     <div class="flex-1 min-h-0 flex max-[760px]:flex-col">
-      <ContentFolderTree v-model="folder" :stack="stack" :load="folderLoad" cache-kind="des" all-label="All data extensions" class="w-60 shrink-0 border-r border-border max-[760px]:w-full max-[760px]:max-h-48 max-[760px]:border-r-0 max-[760px]:border-b" />
+      <ContentFolderTree v-model="folder" :stack="stack" :load="folderLoad" cache-kind="des" all-label="All data extensions" :items="results" :items-folder="listFolder" :items-total="total" :item-icon="Database" :active-item="detail?.id" @item="openDetail" class="w-60 shrink-0 border-r border-border max-[760px]:w-full max-[760px]:max-h-48 max-[760px]:border-r-0 max-[760px]:border-b" />
       <div class="flex-1 min-w-0 flex flex-col">
         <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 flex flex-col gap-3.5">
           <!-- Search and filters -->

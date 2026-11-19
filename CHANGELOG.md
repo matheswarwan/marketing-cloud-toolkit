@@ -7,6 +7,10 @@ All notable changes to Marketing Cloud Toolkit. Versions 2.0.0 and later are pub
 **Changed:**
 - Run Query opens with your last panels or one empty panel (Settings > Running queries); by default it learns which from what you do first after it opens, and Reopen last panels brings the old ones back (feedback #1111). Start fresh is now the first button in the toolbar (feedback #1113).
 - Feedback: a question needs an email, since it cannot be answered otherwise (feedback #1112); I like it opens the Chrome Web Store review page, where reviews are public (feedback #1114).
+- Folder trees (Data Extensions, CloudPages, Emails, Automations, Journeys): opening a folder lists its sub-folders and then its items, and clicking an item opens it as in the list (feedback #1119). Long folder names scroll sideways and show in full on hover (feedback #1118).
+
+**Fixed:**
+- Preview data works for Synchronized data extensions: their rows are read the way Contact Builder reads them, by the DE's ID; if one way fails the other is tried (feedback #1120).
 
 ## 2.0.23 (2026-11-12)
 

@@ -27,6 +27,7 @@ const { stack } = useStack()
 const query = ref('')
 const searched = ref(null)
 const pages = ref([])
+const listFolder = ref(null) // folder id the list shows in full (#1119), else null
 const total = ref(0)
 const pageNo = ref(1)
 const loading = ref(false)
@@ -65,6 +66,7 @@ async function search(mode = 'search') {
       sortBy: (x, y) => String(y.modifiedDate || '').localeCompare(String(x.modifiedDate || '')),
     }))
     pages.value = r.items
+    listFolder.value = params.folderId != null && !params.query ? params.folderId : null // tree items (#1119)
     total.value = r.total
     listInfo.value = { savedAt: r.savedAt, mode: r.mode, changed: r.changed }
     pageNo.value = Math.max(1, Math.ceil(r.items.length / CP_PAGE_SIZE))
@@ -185,7 +187,7 @@ const columns = [
       <Button variant="ghost" size="icon" class="h-8 w-8" title="Refresh: forget cached URLs and folders" @click="refresh"><RefreshCw class="h-4 w-4" /></Button>
     </div>
     <div class="flex-1 min-h-0 flex max-[760px]:flex-col">
-    <ContentFolderTree ref="tree" v-model="folder" :stack="stack" category-type="cloudpages" all-label="All CloudPages" :all-icon="Globe" class="w-60 shrink-0 border-r border-border max-[760px]:w-full max-[760px]:max-h-48 max-[760px]:border-r-0 max-[760px]:border-b" />
+    <ContentFolderTree ref="tree" v-model="folder" :stack="stack" category-type="cloudpages" all-label="All CloudPages" :all-icon="Globe" :items="shown" :items-folder="listFolder" :items-total="total" :item-icon="Globe" :active-item="viewing?.id" @item="(p) => (viewing = p)" class="w-60 shrink-0 border-r border-border max-[760px]:w-full max-[760px]:max-h-48 max-[760px]:border-r-0 max-[760px]:border-b" />
     <div class="flex-1 min-w-0 overflow-y-auto p-4">
       <SfmcErrorNotice :error="error" :retrying="loading" @retry="search('search')" />
       <div v-if="searched === null && !loading" class="max-w-md mx-auto mt-12 text-center text-sm text-muted-foreground">

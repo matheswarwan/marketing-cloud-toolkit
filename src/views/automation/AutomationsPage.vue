@@ -3,7 +3,7 @@
 // all, newest run first; View opens the automation without pausing it.
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Loader2 } from 'lucide-vue-next'
+import { Search, Loader2, Workflow } from 'lucide-vue-next'
 import DataTable from '@/components/results/DataTable.vue'
 import { setBrowseList } from '@/utils/browseList.js'
 import DownloadMenu from '@/components/results/DownloadMenu.vue'
@@ -31,6 +31,7 @@ const { stack } = useStack()
 const query = ref('')
 const searched = ref(null)
 const entries = ref([])
+const listFolder = ref(null) // folder id the list shows in full (#1119), else null
 const total = ref(0)
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -64,6 +65,7 @@ async function search(mode = 'search') {
     }))
     listInfo.value = { savedAt: r.savedAt, mode: r.mode, changed: r.changed }
     entries.value = r.items.filter((a) => inFolder(a, folder.value?.id))
+    listFolder.value = params.categoryId != null && !params.query ? params.categoryId : null // tree items (#1119)
     // SFMC ignored the folder: count what is shown (feedback #1064).
     total.value = entries.value.length < r.items.length ? entries.value.length : r.total
     picked.value = new Set()
@@ -149,7 +151,7 @@ const columns = [
       <span class="text-xs text-muted-foreground">Viewing an automation never pauses or changes it.</span>
     </div>
     <div class="flex-1 min-h-0 flex max-[760px]:flex-col">
-    <ContentFolderTree v-model="folder" :stack="stack" :load="folderLoad" cache-kind="automations" all-label="All automations" class="w-60 shrink-0 border-r border-border max-[760px]:w-full max-[760px]:max-h-48 max-[760px]:border-r-0 max-[760px]:border-b" />
+    <ContentFolderTree v-model="folder" :stack="stack" :load="folderLoad" cache-kind="automations" all-label="All automations" :items="entries" :items-folder="listFolder" :items-total="total" :item-icon="Workflow" @item="(a) => router.push(`/automations/${encodeURIComponent(a.id)}`)" class="w-60 shrink-0 border-r border-border max-[760px]:w-full max-[760px]:max-h-48 max-[760px]:border-r-0 max-[760px]:border-b" />
     <div class="flex-1 min-w-0 overflow-y-auto p-4">
       <SfmcErrorNotice :error="error" :retrying="loading" @retry="search('search')" />
       <div v-if="searched === null && !loading" class="max-w-md mx-auto mt-12 text-center text-sm text-muted-foreground">
