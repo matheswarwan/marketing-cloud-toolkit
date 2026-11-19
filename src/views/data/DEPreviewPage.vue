@@ -19,7 +19,8 @@ const de = computed(() => {
     id: one(q.id),
     customerKey: one(q.key),
     name: one(q.name) || one(q.key),
-    sourceType: source === 'shared' || source === 'synchronized' ? source : null,
+    // The DE list sends 'sync', the data model 'synchronized' (#1120: 'sync' used to be dropped).
+    sourceType: source === 'shared' ? 'shared' : source === 'sync' || source === 'synchronized' ? 'sync' : null,
   }
 })
 const newTabHref = computed(() => {

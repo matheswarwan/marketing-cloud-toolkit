@@ -1,7 +1,8 @@
 // Rows of one data extension, read straight from SFMC (feedback #117): the REST
 // customobjectdata rowset by customer key, the call Run Query already uses for its
 // results. No query activity and no results DE are made.
-import { fetchDERows } from './sfmcApi.js'
+import { fetchDERows, fetchDERowsById } from './sfmcApi.js'
+import { CONNECTION_CODES } from './sfmcErrors.js'
 
 export const ROWS_PAGE = 50
 export const LOAD_ALL_PAGE = 2500
@@ -12,7 +13,9 @@ export function rowsFrom(items, columnNames = []) {
   const proper = new Map(columnNames.map((n) => [String(n).toLowerCase(), n]))
   return (items || []).map((it) => {
     const row = {}
-    for (const [k, v] of Object.entries({ ...(it.keys || {}), ...(it.values || {}) })) row[proper.get(k.toLowerCase()) ?? k] = v
+    // Public rowset: { keys, values }. Contact Builder's internal call: a flat object.
+    const flat = it && (it.keys || it.values) ? { ...(it.keys || {}), ...(it.values || {}) } : { ...(it || {}) }
+    for (const [k, v] of Object.entries(flat)) row[proper.get(k.toLowerCase()) ?? k] = v
     return row
   })
 }
@@ -106,4 +109,67 @@ export async function reloadRows({ stack, key, want, columnNames = [], fetchPage
     if (total != null && rows.length >= total) last = true
   }
   return { rows, total, done: !!last }
+}
+
+/**
+ * Page reader by ID through Contact Builder, shaped like fetchDERows (stack, key, page, size).
+ * If SFMC answers with a smaller pageSize than asked, it reads several of its pages so the
+ * rows match what fetchDERows would return for (page, size).
+ */
+export function byIdPages(deId, fetchById = fetchDERowsById) {
+  let cap = null // SFMC's largest page, once it has answered with a smaller one than asked
+  return async (stack, _key, page, size) => {
+    if (!cap || cap >= size) {
+      const d = await fetchById(stack, deId, page, size)
+      const served = Number(d?.pageSize) || size
+      if (served >= size) return d
+      cap = served
+    }
+    // Read SFMC's smaller pages from row `start` until `size` rows (or the end).
+    const start = (page - 1) * size
+    let p = Math.floor(start / cap) + 1
+    let skip = start % cap
+    let items = []
+    let count
+    for (;;) {
+      const d = await fetchById(stack, deId, p, cap)
+      if (d?.count != null) count = d.count
+      const got = d?.items || []
+      items = items.concat(got.slice(skip))
+      skip = 0
+      if (items.length >= size || got.length < cap) break
+      p += 1
+    }
+    return { count, pageSize: size, items: items.slice(0, size) }
+  }
+}
+
+/**
+ * The page reader for one DE (feedback #1120). Synchronized DEs read by ID through Contact
+ * Builder first (the public rowset by key fails for them), the rest by key first; when the
+ * first way fails with anything but a connection error and the DE's ID is known, the other
+ * way is tried, and whichever worked is kept for the next pages.
+ */
+export function rowsReader(de, { byKey = fetchDERows, fetchById = fetchDERowsById } = {}) {
+  const ways = []
+  const id = de?.id || de?.objectId
+  const internal = id ? byIdPages(id, fetchById) : null
+  if ((de?.sourceType === 'sync' || de?.sourceType === 'synchronized') && internal) ways.push(internal, byKey)
+  else { ways.push(byKey); if (internal) ways.push(internal) }
+  let chosen = null
+  return async (stack, key, page, size) => {
+    if (chosen) return chosen(stack, key, page, size)
+    let firstErr
+    for (const way of ways) {
+      try {
+        const d = await way(stack, key, page, size)
+        chosen = way
+        return d
+      } catch (e) {
+        if (CONNECTION_CODES.has(e?.code)) throw e
+        if (!firstErr) firstErr = e
+      }
+    }
+    throw firstErr
+  }
 }

@@ -13,7 +13,7 @@ import SfmcErrorNotice from '@/components/results/SfmcErrorNotice.vue'
 import Button from '@/components/ui/button/Button.vue'
 import { withReconnect, searchError } from '@/utils/sfmcErrors.js'
 import { fetchDEFieldList } from '@/utils/deApi.js'
-import { fetchRowsAt, fetchLastRows, loadRemainingRows, reloadRows, columnsFor, filterRows, ROWS_PAGE, LOAD_ALL_LIMIT } from '@/utils/deRows.js'
+import { fetchRowsAt, fetchLastRows, loadRemainingRows, reloadRows, columnsFor, filterRows, rowsReader, ROWS_PAGE, LOAD_ALL_LIMIT } from '@/utils/deRows.js'
 import { showToast } from '@/composables/useToast.js'
 import { useRouter } from 'vue-router'
 import { duplicatesSql, distinctSql } from '@/utils/columnValues.js'
@@ -25,6 +25,9 @@ const props = defineProps({
   newTabHref: { type: String, default: '' }, // page mode: link that opens this preview in a new tab
 })
 const emit = defineEmits(['close'])
+// One row reader per DE: keeps the way that worked (public rowset or Contact Builder by ID, #1120).
+const reader = computed(() => rowsReader(props.de))
+const readPage = () => reader.value
 const router = useRouter()
 
 // "Distinct values / Duplicates in SFMC" from a column's values (feedback #1012):
@@ -77,7 +80,7 @@ async function loadMore() {
   loading.value = true
   error.value = ''
   try {
-    const r = await withReconnect(props.stack, () => fetchRowsAt(props.stack, props.de.customerKey, rows.value.length, ROWS_PAGE, fieldNames.value))
+    const r = await withReconnect(props.stack, () => fetchRowsAt(props.stack, props.de.customerKey, rows.value.length, ROWS_PAGE, fieldNames.value, readPage()))
     add(r.rows, r.total)
     if (r.last) done.value = true
   } catch (e) {
@@ -93,7 +96,7 @@ async function loadAll() {
   error.value = ''
   try {
     await withReconnect(props.stack, () => loadRemainingRows({
-      stack: props.stack, key: props.de.customerKey, have: rows.value.length, columnNames: fieldNames.value,
+      stack: props.stack, key: props.de.customerKey, have: rows.value.length, columnNames: fieldNames.value, fetchPage: readPage(),
       limit: LOAD_ALL_LIMIT, onRows: add, shouldStop: () => all.value.stop,
     }))
     if (!all.value.stop && (total.value == null || rows.value.length >= total.value)) done.value = true
@@ -119,7 +122,7 @@ async function loadLast() {
   error.value = ''
   try {
     const r = await withReconnect(props.stack, () => fetchLastRows({
-      stack: props.stack, key: props.de.customerKey, n, total: total.value, columnNames: fieldNames.value,
+      stack: props.stack, key: props.de.customerKey, n, total: total.value, columnNames: fieldNames.value, fetchPage: readPage(),
     }))
     rows.value = r.rows
     total.value = r.total
@@ -156,7 +159,7 @@ async function refresh() {
   error.value = ''
   try {
     const r = await withReconnect(props.stack, () => reloadRows({
-      stack: props.stack, key: props.de.customerKey, want: Math.max(rows.value.length, ROWS_PAGE), columnNames: fieldNames.value,
+      stack: props.stack, key: props.de.customerKey, want: Math.max(rows.value.length, ROWS_PAGE), columnNames: fieldNames.value, fetchPage: readPage(),
     }))
     rows.value = r.rows
     total.value = r.total

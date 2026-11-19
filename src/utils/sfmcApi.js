@@ -711,6 +711,18 @@ export async function fetchDERows(stack, deKey, page = 1, pageSize = 2500, fetch
   return fetch(url, 'GET', null)
 }
 
+/**
+ * One page of rows by the DE's ID through Contact Builder's own call (feedback #1120):
+ * the public rowset by key fails for Synchronized DEs, this one works. Items come back as
+ * flat objects ({ field: value }), not { keys, values }. The response's pageSize may be
+ * smaller than asked for; deRows.js pages around that.
+ */
+export async function fetchDERowsById(stack, deId, page = 1, pageSize = 2500, fetch = proxyFetch) {
+  _logInfo(`Fetching rows of DE ${deId} through Contact Builder - page ${page}, up to ${pageSize} rows`)
+  const url = `${MCA_CM(stack)}/internal/v1/CustomObjectData/${encodeURIComponent(deId)}?$page=${page}&$pagesize=${pageSize}&preciseDateTime=true`
+  return fetch(url, 'GET', null)
+}
+
 // ── Cleanup: Delete DE ────────────────────────────────────
 
 export async function deleteDE(stack, deId) {

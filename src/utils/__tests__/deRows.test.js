@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { rowsFrom, columnsFor, fetchRowsAt, loadRemainingRows, filterRows, reloadRows, fetchLastRows } from '../deRows.js'
+import { describe, it, expect, vi } from 'vitest'
+import { rowsFrom, columnsFor, fetchRowsAt, loadRemainingRows, filterRows, reloadRows, fetchLastRows, rowsReader, byIdPages } from '../deRows.js'
 
 // A fake rowset of `n` rows: SFMC sends lower-cased names, keys and values apart.
 function fakeRowset(n) {
@@ -122,5 +122,74 @@ describe('Load last N rows (feedback #1097)', () => {
   it('fails clearly when SFMC gives no count', async () => {
     const noCount = async () => ({ items: [{ keys: { id: '0' } }] })
     await expect(fetchLastRows({ stack: 's1', key: 'K', n: 5, fetchPage: noCount })).rejects.toThrow(/how many rows/)
+  })
+})
+
+// Feedback #1120: Synchronized DEs read through Contact Builder by ID.
+
+describe('rowsFrom with flat items (Contact Builder internal call)', () => {
+  it('maps flat objects with the field names put back', () => {
+    expect(rowsFrom([{ status__c: 'Open', id: 'a1' }], ['Status__c', 'Id'])).toEqual([{ Status__c: 'Open', Id: 'a1' }])
+  })
+})
+
+describe('byIdPages', () => {
+  it('returns the page as is when SFMC serves the size asked for', async () => {
+    const f = vi.fn(async () => ({ count: 3, pageSize: 50, items: [{ a: 1 }] }))
+    const d = await byIdPages('de-1', f)('s50', 'KEY', 1, 50)
+    expect(d.items).toEqual([{ a: 1 }])
+    expect(f).toHaveBeenCalledWith('s50', 'de-1', 1, 50)
+  })
+  it('reads several smaller pages when SFMC caps the page size', async () => {
+    const all = Array.from({ length: 120 }, (_, i) => ({ n: i }))
+    const f = vi.fn(async (_s, _id, page, size) => {
+      const cap = Math.min(size, 25)
+      return { count: 120, pageSize: cap, items: all.slice((page - 1) * cap, page * cap) }
+    })
+    const read = byIdPages('de-1', f)
+    const d = await read('s50', 'KEY', 2, 50) // rows 50..99
+    expect(d.items.map((r) => r.n)).toEqual(all.slice(50, 100).map((r) => r.n))
+    expect(d.count).toBe(120)
+    f.mockClear()
+    const last = await read('s50', 'KEY', 3, 50) // rows 100..119; cap remembered, no probe
+    expect(last.items.map((r) => r.n)).toEqual(all.slice(100).map((r) => r.n))
+    expect(f.mock.calls.every((c) => c[3] === 25)).toBe(true)
+  })
+})
+
+describe('rowsReader', () => {
+  const ok = (tag) => vi.fn(async () => ({ count: 1, pageSize: 50, items: [{ tag }] }))
+  const bad = () => vi.fn(async () => { throw Object.assign(new Error('400'), { status: 400 }) })
+
+  it('reads a Synchronized DE by ID first', async () => {
+    const byKey = ok('key'); const fetchById = ok('id')
+    const d = await rowsReader({ id: 'x', sourceType: 'sync' }, { byKey, fetchById })('s50', 'K', 1, 50)
+    expect(d.items[0].tag).toBe('id')
+    expect(byKey).not.toHaveBeenCalled()
+  })
+  it('accepts the synchronized spelling too', async () => {
+    const fetchById = ok('id')
+    await rowsReader({ id: 'x', sourceType: 'synchronized' }, { byKey: ok('key'), fetchById })('s50', 'K', 1, 50)
+    expect(fetchById).toHaveBeenCalled()
+  })
+  it('falls back to the ID call when the key call fails, and keeps it', async () => {
+    const byKey = bad(); const fetchById = ok('id')
+    const read = rowsReader({ id: 'x' }, { byKey, fetchById })
+    expect((await read('s50', 'K', 1, 50)).items[0].tag).toBe('id')
+    await read('s50', 'K', 2, 50)
+    expect(byKey).toHaveBeenCalledTimes(1)
+  })
+  it('throws the first error when both fail, and never retries a connection error', async () => {
+    const e1 = Object.assign(new Error('first'), { status: 400 })
+    const byKey = vi.fn(async () => { throw e1 })
+    await expect(rowsReader({ id: 'x' }, { byKey, fetchById: bad() })('s50', 'K', 1, 50)).rejects.toBe(e1)
+    const login = Object.assign(new Error('login'), { code: 'SFMC_LOGIN_REQUIRED' })
+    const fetchById = ok('id')
+    await expect(rowsReader({ id: 'x' }, { byKey: vi.fn(async () => { throw login }), fetchById })('s50', 'K', 1, 50)).rejects.toBe(login)
+    expect(fetchById).not.toHaveBeenCalled()
+  })
+  it('uses only the key call when the DE has no ID', async () => {
+    const byKey = bad()
+    await expect(rowsReader({ customerKey: 'K' }, { byKey, fetchById: ok('id') })('s50', 'K', 1, 50)).rejects.toThrow('400')
   })
 })
