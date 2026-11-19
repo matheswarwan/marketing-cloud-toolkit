@@ -12,6 +12,30 @@ export const TO_TEST = [
     status: 'Not released: test builds only',
     items: [
       {
+        id: '2.0.25-features-version', area: 'General', title: 'Features: what is new since a version', ref: '#1107', from: 'Foram', live: false,
+        where: 'Features (Settings > About, or About in the sidebar)',
+        steps: ['Pick New in <latest> (latest), then an older version.', 'Type in Search features with a version picked.', 'Click Show all.'],
+        expect: 'Only features new in that version or later show, with a count; the section chips hide while filtered; search works inside the filter; Show all brings everything back.',
+      },
+      {
+        id: '2.0.25-capture-scrolled', area: 'General', title: 'Capture this page on a scrolled page', ref: '#1108', from: 'Foram', live: false,
+        where: 'Feedback > Capture this page',
+        steps: ['On Settings (or Features), scroll to the bottom.', 'Open feedback and click Capture this page.'],
+        expect: 'The picture shows the part of the page that was on screen, not the top. The page is still scrolled where it was afterwards.',
+      },
+      {
+        id: '2.0.25-about', area: 'General', title: 'About in the sidebar', ref: '#1109', from: 'Foram', live: false,
+        where: 'Sidebar bottom, below Settings; also Ctrl+K: About',
+        steps: ['Click About in the sidebar (also with the sidebar collapsed).'],
+        expect: 'About shows the version, the credit, and buttons for Features, Privacy policy, Send feedback, Write a review and Settings.',
+      },
+      {
+        id: '2.0.25-scroll-top', area: 'General', title: 'Pages open at the top', ref: '#1110', from: 'Foram', live: false,
+        where: 'Any page, then Features',
+        steps: ['Scroll down on Settings, then open Features.', 'Go to Data Extensions, scroll, go elsewhere, come back.'],
+        expect: 'Features opens at the top. Pages that stay open in the background (Run Query, Query Builder, Data Extensions, Automations and other lists) come back where you left them.',
+      },
+      {
         id: '2.0.25-run-query-start', area: 'Queries', title: 'What Run Query opens with, learned from use', ref: '#1111', from: 'Foram', live: false,
         where: 'Queries > Run Query; Settings > Running queries > When Run Query opens, show',
         steps: ['With a query in a panel, open a new Toolkit tab on Run Query and click Start fresh. Do this 3 times.', 'Open a new Toolkit tab on Run Query.', 'Click Reopen last panels.', 'In Settings, pick My last panels, then One empty panel, and open Run Query each time.'],

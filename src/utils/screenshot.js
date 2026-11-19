@@ -4,8 +4,41 @@
 const MAX_WIDTH = 1600
 const MAX_BYTES = 1_500_000 // the feedback worker accepts up to 1.9 MB
 
+// html-to-image draws a copy of the page, and a copy has no scroll position: a
+// scrolled area came out showing its top (feedback #1108). For the capture, each
+// scrolled element is put back to 0 with its children shifted by the same amount, so
+// the copy shows what is on screen; everything is put back afterwards.
+export function freezeScroll(root) {
+  const undo = []
+  for (const el of [root, ...root.querySelectorAll('*')]) {
+    const top = el.scrollTop
+    const left = el.scrollLeft
+    if (!top && !left) continue
+    const kids = [...el.children]
+    const old = kids.map((k) => k.style.transform)
+    kids.forEach((k) => { k.style.transform = `translate(${-left}px, ${-top}px)${k.style.transform ? ' ' + k.style.transform : ''}` })
+    el.scrollTop = 0
+    el.scrollLeft = 0
+    undo.push(() => {
+      kids.forEach((k, i) => { k.style.transform = old[i] })
+      el.scrollTop = top
+      el.scrollLeft = left
+    })
+  }
+  return () => { for (const f of undo.reverse()) f() }
+}
+
 export async function capturePage(element, { exclude } = {}) {
   const { toCanvas } = await import('html-to-image')
+  const thaw = freezeScroll(element)
+  try {
+    return await drawPage(toCanvas, element, exclude)
+  } finally {
+    thaw()
+  }
+}
+
+function drawPage(toCanvas, element, exclude) {
   return toCanvas(element, {
     pixelRatio: 1,
     cacheBust: true,

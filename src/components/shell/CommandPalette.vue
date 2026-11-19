@@ -4,7 +4,7 @@
 import { routeBlocked } from '@/utils/policy.js'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, FileCode2, Mail, Settings, BookOpen, ArrowRight, History } from 'lucide-vue-next'
+import { Search, FileCode2, Mail, Settings, BookOpen, ArrowRight, History, Info } from 'lucide-vue-next'
 import { NAV_ITEMS } from '@/app/nav.js'
 import { paletteEntries } from '@/utils/paletteSearch.js'
 
@@ -16,6 +16,7 @@ const SECTIONS = [
   ...NAV_ITEMS,
   { path: '/settings', name: 'Settings', group: 'App', icon: Settings },
   { path: '/features', name: 'Features', group: 'App', icon: BookOpen },
+  { path: '/about', name: 'About', group: 'App', icon: Info },
 ]
 const KIND_ICONS = { query: FileCode2, email: Mail, activity: History, search: Search }
 

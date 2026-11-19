@@ -105,6 +105,7 @@ export const routes = [
   { path: '/features', component: () => import('../views/info/InfoPage.vue'), props: { page: 'features' }, meta: { title: 'Features' } },
   // To do is hidden from users (feedback #77); old links and todo.html land on Features.
   { path: '/todo', redirect: '/features' },
+  { path: '/about', component: () => import('../views/info/AboutPage.vue'), meta: { title: 'About' } },
   { path: '/settings', component: () => import('../views/settings/SettingsPage.vue'), meta: { title: 'Settings' } },
   // Background tasks of this tab and earlier ones (feedback #1092); linked from the bell and the header pill.
   { path: '/activity', component: () => import('../views/info/ActivityHistoryPage.vue'), meta: { title: 'Activity history' } },

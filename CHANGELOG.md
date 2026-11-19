@@ -6,6 +6,8 @@ All notable changes to Marketing Cloud Toolkit. Versions 2.0.0 and later are pub
 
 **Changed:**
 - Run Query opens with your last panels or one empty panel (Settings > Running queries); by default it learns which from what you do first after it opens, and Reopen last panels brings the old ones back (feedback #1111). Start fresh is now the first button in the toolbar (feedback #1113).
+- About is in the sidebar (feedback #1109); Features can show only what is new since a version (feedback #1107).
+- A page opens at the top instead of at the last page's scroll position (feedback #1110); Capture this page shows the scrolled part on screen, not the top (feedback #1108).
 - Feedback: a question needs an email, since it cannot be answered otherwise (feedback #1112); I like it opens the Chrome Web Store review page, where reviews are public (feedback #1114).
 
 ## 2.0.23 (2026-11-12)
