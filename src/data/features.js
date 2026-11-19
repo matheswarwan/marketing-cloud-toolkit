@@ -31,6 +31,8 @@ export const FEATURE_GROUPS = [
       { title: 'New tabs next to this one', since: '2.0.11', detail: 'Links into SFMC and other tabs the Toolkit opens appear right after the current tab instead of at the end.' },
       { title: 'Light, dark or system theme', how: 'The moon icon, or Settings', detail: 'System follows your computer.' },
       { title: 'Feedback', how: 'The speech bubble in the top bar', detail: 'Say what happened (or your idea), add details, and attach a screenshot: of this page, of another tab or window such as SFMC, or an image you upload or paste. Draw boxes or freehand on it to point at the problem or cover anything private. Technical details (version, browser, section, stack, business unit, the last failed SFMC calls; never SQL or data) are included unless you untick them, and you can see exactly what is sent. Your name and email are filled in from the last time you sent feedback.' },
+      { title: 'About', since: '2.0.25', how: 'About at the bottom of the sidebar', detail: 'The version, who made it, and links to Features, the privacy policy, feedback, a store review and Settings.' },
+      { title: 'New since a version', since: '2.0.25', how: 'Features > Show', detail: 'Lists only what is new in a version or since it, newest version first.' },
       { title: 'Review on the Chrome Web Store', since: '2.0.25', how: 'Feedback > I like it, or Settings > About > Write a review', detail: 'Opens the store\'s review page, where reviews are public. A question needs an email, since feedback carries no address otherwise and could not be answered.' },
     ],
   },

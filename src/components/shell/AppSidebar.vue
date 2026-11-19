@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { PanelLeftClose, PanelLeftOpen, Settings, FlaskConical } from 'lucide-vue-next'
+import { PanelLeftClose, PanelLeftOpen, Settings, FlaskConical, Info } from 'lucide-vue-next'
 import { NAV_GROUPS } from '@/app/nav.js'
 import { policy, routeBlocked } from '@/utils/policy.js'
 import CreatorCredit from './CreatorCredit.vue'
@@ -84,6 +84,16 @@ const groups = computed(() => (policy.loaded, NAV_GROUPS.filter((g) => !g.hidden
       >
         <Settings class="h-4 w-4 shrink-0" />
         <span v-if="!collapsed">Settings</span>
+      </RouterLink>
+      <RouterLink
+        to="/about"
+        :title="collapsed ? 'About' : undefined"
+        class="flex items-center gap-2.5 mx-1.5 px-2.5 h-8 rounded-md text-sm text-foreground/80 hover:bg-accent"
+        active-class="bg-[#EEF1F5]! dark:bg-accent! text-foreground! font-medium"
+        data-about-link
+      >
+        <Info class="h-4 w-4 shrink-0" />
+        <span v-if="!collapsed">About</span>
       </RouterLink>
       <button
         class="flex items-center gap-2.5 mx-1.5 px-2.5 h-8 rounded-md text-sm text-muted-foreground hover:bg-accent w-[calc(100%-0.75rem)]"

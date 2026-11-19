@@ -5,6 +5,7 @@ import { ref, computed } from 'vue'
 import { Search } from 'lucide-vue-next'
 import { FEATURE_GROUPS } from '@/data/features.js'
 import CreatorCredit from '@/components/shell/CreatorCredit.vue'
+import { featureVersions, featuresSince } from '@/utils/featureVersions.js'
 
 defineProps({
   page: { type: String, default: 'features' },
@@ -15,10 +16,16 @@ const version = (() => {
 })()
 
 const query = ref('')
+// Feedback #1107: only what is new since a version. Versions above this build's are
+// left out of the list (a store build never shows unreleased ones).
+const versions = featureVersions(FEATURE_GROUPS, version)
+const sinceVersion = ref('')
+const byVersion = computed(() => featuresSince(FEATURE_GROUPS, sinceVersion.value, version))
+const shownCount = computed(() => byVersion.value.reduce((n, g) => n + g.items.length, 0))
 const filteredFeatures = computed(() => {
   const q = query.value.trim().toLowerCase()
-  if (!q) return FEATURE_GROUPS
-  return FEATURE_GROUPS
+  if (!q) return byVersion.value
+  return byVersion.value
     .map(g => ({
       ...g,
       items: g.items.filter(f =>
@@ -59,12 +66,22 @@ function scrollTo(id) {
           />
         </div>
 
-        <nav v-if="!query" class="flex flex-wrap gap-1.5 mt-3 text-xs">
+        <div class="flex flex-wrap items-center gap-2 mt-3 text-xs" data-testid="features-version">
+          <label for="features-since" class="text-muted-foreground">Show</label>
+          <select id="features-since" v-model="sinceVersion" class="h-7 rounded-md border border-border bg-card px-2 text-xs">
+            <option value="">All features</option>
+            <option v-for="(v, i) in versions" :key="v" :value="v">{{ i === 0 ? `New in ${v} (latest)` : `New since ${v}` }}</option>
+          </select>
+          <span v-if="sinceVersion" class="text-muted-foreground">{{ shownCount }} {{ shownCount === 1 ? 'feature' : 'features' }}</span>
+          <button v-if="sinceVersion" type="button" class="text-primary hover:underline" @click="sinceVersion = ''">Show all</button>
+        </div>
+
+        <nav v-if="!query && !sinceVersion" class="flex flex-wrap gap-1.5 mt-3 text-xs">
           <button v-for="g in FEATURE_GROUPS" :key="g.id" type="button" @click="scrollTo(g.id)"
             class="px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:text-foreground">{{ g.title }}</button>
         </nav>
 
-        <p v-if="!filteredFeatures.length" class="text-sm text-muted-foreground mt-6">No feature matches "{{ query }}".</p>
+        <p v-if="!filteredFeatures.length" class="text-sm text-muted-foreground mt-6">{{ query ? `No feature matches "${query}".` : 'Nothing new since that version.' }}</p>
 
         <section v-for="g in filteredFeatures" :id="g.id" :key="g.id" class="mt-8 scroll-mt-16">
           <h3 class="text-base font-bold border-b border-border pb-1">{{ g.title }}</h3>

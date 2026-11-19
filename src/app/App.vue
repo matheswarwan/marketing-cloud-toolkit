@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Search, MessageSquare, Network, Loader2 } from 'lucide-vue-next'
 import AppSidebar from '@/components/shell/AppSidebar.vue'
@@ -33,6 +33,23 @@ import { errorReport } from '@/composables/useReportError.js'
 
 const route = useRoute()
 const KEEP_ALIVE = ['WorkspacePage', 'BuilderPage', 'DataExtensionsPage', 'WhereUsedPage', 'DEStoragePage', 'AutomationsPage', 'ActivitiesPage', 'JourneysPage', 'JourneyEntryPage', 'CloudPagesPage']
+
+// One scrolling <main> serves every page, so a new page used to open at the previous
+// page's scroll position (feedback #1110: Features opened halfway down). A new page
+// starts at the top; a kept-alive page comes back where it was left.
+const mainEl = ref(null)
+const scrollByPath = new Map()
+const isKeptAlive = () => route.matched.some((r) => {
+  const c = r.components?.default
+  return KEEP_ALIVE.includes(c?.name || c?.__name)
+})
+watch(() => route.path, async (to, from) => {
+  const el = mainEl.value
+  if (!el) return
+  if (from) scrollByPath.set(from, el.scrollTop)
+  await nextTick()
+  el.scrollTop = isKeptAlive() ? (scrollByPath.get(to) || 0) : 0
+})
 // The palette can also be opened with text (Home's search box): composables/usePalette.js.
 const paletteOpen = computed({
   get: () => paletteState.value.open,
@@ -130,7 +147,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     <div class="flex-1 flex flex-col min-w-0">
       <SecretAlerts variant="bar" />
       <MessageBar />
-      <main class="flex-1 min-h-0 overflow-auto">
+      <main ref="mainEl" class="flex-1 min-h-0 overflow-auto">
         <!-- These stay alive in the background, so a running query, a half-built join
              or a list of search results survives a visit to another section. -->
         <RouterView v-slot="{ Component }">
