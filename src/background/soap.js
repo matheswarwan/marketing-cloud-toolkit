@@ -12,6 +12,7 @@
 
 import { getMcaToken, renewMcaToken } from './mcaToken.js'
 import { sfmcFetch } from './fetchProxy.js'
+import { sfmcSession } from './stack.js'
 
 export const SOAP_OBJECTS = new Set([
   'AccountUser', 'Role', 'BusinessUnit', 'Send', 'TriggeredSendDefinition', 'TriggeredSendSummary',
@@ -46,6 +47,24 @@ export function soapUrlFromEndpoints(items) {
   if (url.protocol !== 'https:' || !SOAP_HOST.test(url.hostname)) return null
   return `https://${url.hostname.toLowerCase()}/Service.asmx`
 }
+
+/**
+ * The tenant SOAP address from an SSO context (content.js reads it from the login JWT):
+ * `<tenant>.rest.` or `<tenant>.auth.marketingcloudapis.com` gives
+ * `<tenant>.soap.marketingcloudapis.com`. Used when the endpoint list can't be read
+ * (feedback #1116: Subscriber lookup "Failed to fetch" on a stack without webservice.<stack>).
+ */
+export function soapUrlFromContext(ctx) {
+  for (const raw of [ctx?.restBase, ctx?.authEndpoint]) {
+    let host
+    try { host = new URL(String(raw)).hostname } catch { continue }
+    const m = /^([a-z0-9-]{1,63})\.(?:rest|auth)\.marketingcloudapis\.com$/i.exec(host)
+    if (m) return `https://${m[1].toLowerCase()}.soap.marketingcloudapis.com/Service.asmx`
+  }
+  return null
+}
+
+const contextSoapUrl = (stack) => soapUrlFromContext(sfmcSession['_stack_' + stack])
 
 const endpointCache = new Map() // stack → Promise<string|null>, kept while the worker lives
 
@@ -99,13 +118,15 @@ const authFailed = (status, text) => status === 401 || /Login failed|not authori
 
 /**
  * One Retrieve call; returns the response XML. Retries once with a fresh token. Sends to
- * the account's SOAP address; when that host can't be reached, tries webservice.<stack>.
+ * the account's SOAP address; when that host can't be reached, tries the tenant address from
+ * the login JWT, then webservice.<stack>.
  */
-export async function soapRetrieve(request, { fetch: doFetch = fetch, token: tokenFor = getMcaToken, renew = renewMcaToken, endpoint = soapEndpoint } = {}) {
+export async function soapRetrieve(request, { fetch: doFetch = fetch, token: tokenFor = getMcaToken, renew = renewMcaToken, endpoint = soapEndpoint, fromContext = contextSoapUrl } = {}) {
   const { stack } = request
   if (!STACK.test(String(stack || ''))) throw new Error('Unknown stack')
   const legacy = soapUrl(stack)
-  const urls = [...new Set([await endpoint(stack), legacy].filter(Boolean))]
+  // The endpoint list first, then the tenant address from the login JWT, then webservice.<stack>.
+  const urls = [...new Set([await endpoint(stack), fromContext(stack), legacy].filter(Boolean))]
   const post = async (token) => {
     for (const [i, url] of urls.entries()) {
       try {

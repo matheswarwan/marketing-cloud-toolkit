@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { soapUrlFromEndpoints, soapEndpoint, soapRetrieve, retrieveEnvelope } from '../soap.js'
+import { soapUrlFromEndpoints, soapUrlFromContext, soapEndpoint, soapRetrieve, retrieveEnvelope } from '../soap.js'
 
 const OK = '<soap:Envelope><soap:Body><RetrieveResponseMsg><OverallStatus>OK</OverallStatus></RetrieveResponseMsg></soap:Body></soap:Envelope>'
 const request = { stack: 's13', objectType: 'AccountUser', properties: ['ID'] }
@@ -88,5 +88,36 @@ describe('soapRetrieve addresses (feedback #1102)', () => {
 
   it('escapes the address in the envelope', () => {
     expect(retrieveEnvelope(request, 't', 'https://a.soap.marketingcloudapis.com/Service.asmx?x=<y>')).toContain('?x=&lt;y&gt;</a:To>')
+  })
+})
+
+describe('SOAP address from the login JWT (feedback #1116)', () => {
+  it('turns the tenant REST or auth address into its SOAP address', () => {
+    expect(soapUrlFromContext({ restBase: 'https://MC-Tenant1.rest.marketingcloudapis.com' }))
+      .toBe('https://mc-tenant1.soap.marketingcloudapis.com/Service.asmx')
+    expect(soapUrlFromContext({ restBase: '', authEndpoint: 'https://t2.auth.marketingcloudapis.com/v2/token' }))
+      .toBe('https://t2.soap.marketingcloudapis.com/Service.asmx')
+  })
+
+  it('ignores other hosts and missing contexts', () => {
+    expect(soapUrlFromContext({ restBase: 'https://t1.rest.marketingcloudapis.com.evil.com', authEndpoint: 'https://evil.example.com' })).toBeNull()
+    expect(soapUrlFromContext({ restBase: 'https://www.exacttarget.com' })).toBeNull()
+    expect(soapUrlFromContext(null)).toBeNull()
+  })
+
+  it('uses it when the endpoint list cannot be read, before webservice.<stack>', async () => {
+    const fetch = vi.fn(async () => answer())
+    await soapRetrieve(request, { fetch, token, renew: async () => 'tok2', endpoint: async () => null, fromContext: () => 'https://t3.soap.marketingcloudapis.com/Service.asmx' })
+    expect(fetch.mock.calls.map((c) => c[0])).toEqual(['https://t3.soap.marketingcloudapis.com/Service.asmx'])
+  })
+
+  it('tries the list address, then the JWT address, then webservice.<stack>', async () => {
+    const fetch = vi.fn(async (url) => { if (!url.includes('webservice')) throw new TypeError('Failed to fetch'); return answer() })
+    await soapRetrieve(request, { fetch, token, renew: async () => 'tok2', endpoint: async () => 'https://t1.soap.marketingcloudapis.com/Service.asmx', fromContext: () => 'https://t3.soap.marketingcloudapis.com/Service.asmx' })
+    expect(fetch.mock.calls.map((c) => c[0])).toEqual([
+      'https://t1.soap.marketingcloudapis.com/Service.asmx',
+      'https://t3.soap.marketingcloudapis.com/Service.asmx',
+      'https://webservice.s13.exacttarget.com/Service.asmx',
+    ])
   })
 })
