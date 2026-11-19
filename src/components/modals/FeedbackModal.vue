@@ -6,7 +6,8 @@
 // another tab is captured only after a customer-data warning, and Send first shows
 // the exact payload. Admin policies can turn the form, the details or screenshots off.
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { X, Camera, MonitorUp, ImageUp, Trash2, Loader2, ChevronDown, ChevronRight } from 'lucide-vue-next'
+import { X, Camera, MonitorUp, ImageUp, Trash2, Loader2, ChevronDown, ChevronRight, Star, ExternalLink } from 'lucide-vue-next'
+import { STORE_REVIEWS_URL } from '@/utils/storeLinks.js'
 import ScreenshotEditor from '@/components/feedback/ScreenshotEditor.vue'
 import { useStack } from '@/composables/useStack.js'
 import { useTheme } from '@/composables/useTheme.js'
@@ -108,8 +109,12 @@ const payloadPreview = computed(() => {
 })
 const shotPreview = computed(() => payload.value?.screenshot || '')
 
+// A question needs a way to answer it (feedback #1112).
+const emailRequired = computed(() => kind.value === 'question')
+const emailMissing = computed(() => emailRequired.value && !email.value.trim())
+
 function review() {
-  if (!message.value.trim()) return
+  if (!message.value.trim() || emailMissing.value) return
   if (image.value && !shotChecked.value) return
   sendError.value = ''
   sentNote.value = ''
@@ -159,7 +164,9 @@ const KINDS = computed(() => [
   { id: 'problem', label: 'Something is wrong' },
   { id: 'idea', label: 'Idea' },
   { id: 'question', label: 'Question' },
+  { id: 'praise', label: 'I like it' },
 ])
+const isPraise = computed(() => kind.value === 'praise')
 const isResults = computed(() => kind.value === 'test-results')
 </script>
 
@@ -203,6 +210,15 @@ const isResults = computed(() => kind.value === 'test-results')
             @click="kind = k.id">{{ k.label }}</button>
         </div>
 
+        <div v-if="isPraise" class="rounded-md border border-border bg-muted/30 p-4 space-y-2" data-testid="feedback-praise">
+          <p class="font-medium flex items-center gap-1.5"><Star class="h-4 w-4 text-amber-500" /> Thank you! Please say it where others can read it.</p>
+          <p class="text-xs text-muted-foreground">Reviews on the Chrome Web Store are public, so people deciding whether to trust the Toolkit can see what users think. Nothing is sent from here: the button opens the store's review page in a new tab, where you post under your Google account.</p>
+          <a :href="STORE_REVIEWS_URL" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 no-underline">
+            <ExternalLink class="h-4 w-4" /> Write a review on the Chrome Web Store
+          </a>
+        </div>
+
+        <template v-else>
         <p v-if="prefill" class="rounded-md border border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/40 p-2 text-xs">{{ prefill.notice || 'The error is filled in below. Check it for customer data (names, email addresses, record values) and remove anything you do not want to send. Add what you were doing.' }}</p>
         <label class="block">
           <span class="font-medium">{{ isResults ? 'Summary' : kind === 'problem' ? 'What happened?' : kind === 'idea' ? 'Your idea' : 'Your question' }}</span>
@@ -267,15 +283,17 @@ const isResults = computed(() => kind.value === 'test-results')
         <div class="grid grid-cols-2 gap-3">
           <label class="block"><span class="text-xs text-muted-foreground">Name{{ isResults ? '' : ' (optional)' }}</span>
             <input v-model="name" maxlength="100" :required="isResults" class="mt-0.5 w-full h-8 rounded-md border border-border bg-background px-2" /></label>
-          <label class="block"><span class="text-xs text-muted-foreground">Email, if you'd like a reply (optional)</span>
-            <input v-model="email" type="email" maxlength="200" class="mt-0.5 w-full h-8 rounded-md border border-border bg-background px-2" /></label>
+          <label class="block"><span class="text-xs text-muted-foreground">{{ emailRequired ? 'Email (needed for a question)' : 'Email, if you\'d like a reply (optional)' }}</span>
+            <input v-model="email" type="email" maxlength="200" :required="emailRequired" class="mt-0.5 w-full h-8 rounded-md border border-border bg-background px-2" /></label>
         </div>
+        <p v-if="emailMissing" class="text-xs text-amber-700 dark:text-amber-400" data-testid="feedback-email-needed">Feedback is sent without your name or address unless you give them, so we cannot reach you to answer a question without an email.</p>
+        </template>
 
         <p v-if="state === 'error'" class="text-sm text-red-600" role="alert">Could not send ({{ sendError }}). Please try again.</p>
         <div class="flex justify-end gap-2 pt-1">
           <button type="button" class="h-9 px-4 rounded-md border border-border text-sm hover:bg-accent" @click="emit('close')">Cancel</button>
-          <button type="submit" class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm disabled:opacity-50" :disabled="!message.trim() || (image && shotsAllowed && !shotChecked)"
-            :title="image && shotsAllowed && !shotChecked ? 'Tick the screenshot check first' : 'See exactly what is sent, then send'">Review and send</button>
+          <button v-if="!isPraise" type="submit" class="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm disabled:opacity-50" :disabled="!message.trim() || emailMissing || (image && shotsAllowed && !shotChecked)"
+            :title="image && shotsAllowed && !shotChecked ? 'Tick the screenshot check first' : emailMissing ? 'Add your email so the question can be answered' : 'See exactly what is sent, then send'">Review and send</button>
         </div>
       </form>
     </div>

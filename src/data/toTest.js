@@ -12,6 +12,30 @@ export const TO_TEST = [
     status: 'Not released: test builds only',
     items: [
       {
+        id: '2.0.25-run-query-start', area: 'Queries', title: 'What Run Query opens with, learned from use', ref: '#1111', from: 'Foram', live: false,
+        where: 'Queries > Run Query; Settings > Running queries > When Run Query opens, show',
+        steps: ['With a query in a panel, open a new Toolkit tab on Run Query and click Start fresh. Do this 3 times.', 'Open a new Toolkit tab on Run Query.', 'Click Reopen last panels.', 'In Settings, pick My last panels, then One empty panel, and open Run Query each time.'],
+        expect: 'After the third Start fresh a notice says Run Query will now open empty; the next opening shows one empty panel with Reopen last panels, which brings the old panels back. Settings shows the learned choice and the count; picking an option fixes it. Opening a saved query (Open in editor) is not counted.',
+      },
+      {
+        id: '2.0.25-start-fresh-visible', area: 'Queries', title: 'Start fresh easier to find', ref: '#1113', from: 'Foram', live: false,
+        where: 'Queries > Run Query',
+        steps: ['Open Run Query.'],
+        expect: 'Start fresh is the first button in the toolbar, filled blue, before Layout.',
+      },
+      {
+        id: '2.0.25-question-email', area: 'General', title: 'Email needed for a question', ref: '#1112', from: 'Foram', live: false,
+        where: 'Feedback (speech bubble in the top bar)',
+        steps: ['Pick Question, write something, leave Email empty.', 'Add an email.'],
+        expect: 'Without an email, Review and send is off and a note says we cannot reach you to answer without one; with an email it sends. Problem and Idea still send without one.',
+      },
+      {
+        id: '2.0.25-store-review', area: 'General', title: 'I like it: review on the Chrome Web Store', ref: '#1114', from: 'Foram', live: false,
+        where: 'Feedback > I like it; Settings > About > Write a review',
+        steps: ['Pick I like it.', 'Click Write a review on the Chrome Web Store.'],
+        expect: 'The store\'s review page for Marketing Cloud Toolkit opens in a new tab. Nothing is sent from the form.',
+      },
+      {
         id: '2.0.25-automation-paging', area: 'Automation', title: 'Automations past 100', ref: '#1100', from: 'a user (no name given)', live: false,
         where: 'Automation > Automations; Automation overview',
         steps: ['In an account with more than 100 automations, search with an empty box.', 'Click Load more until it stops.'],

@@ -31,6 +31,7 @@ export const FEATURE_GROUPS = [
       { title: 'New tabs next to this one', since: '2.0.11', detail: 'Links into SFMC and other tabs the Toolkit opens appear right after the current tab instead of at the end.' },
       { title: 'Light, dark or system theme', how: 'The moon icon, or Settings', detail: 'System follows your computer.' },
       { title: 'Feedback', how: 'The speech bubble in the top bar', detail: 'Say what happened (or your idea), add details, and attach a screenshot: of this page, of another tab or window such as SFMC, or an image you upload or paste. Draw boxes or freehand on it to point at the problem or cover anything private. Technical details (version, browser, section, stack, business unit, the last failed SFMC calls; never SQL or data) are included unless you untick them, and you can see exactly what is sent. Your name and email are filled in from the last time you sent feedback.' },
+      { title: 'Review on the Chrome Web Store', since: '2.0.25', how: 'Feedback > I like it, or Settings > About > Write a review', detail: 'Opens the store\'s review page, where reviews are public. A question needs an email, since feedback carries no address otherwise and could not be answered.' },
     ],
   },
   {
@@ -77,6 +78,7 @@ export const FEATURE_GROUPS = [
         how: 'Layout buttons 1×1, 1×2, 2×2, 2×3 and + Panel',
         detail: 'Each panel has its own editor, validation, run and history, and panels run independently. Drag the borders to resize, or expand one panel to fill the page while the others keep running. Your panels reopen when you come back; Start fresh begins with one empty panel. Each browser tab keeps its own panels.',
       },
+      { title: 'Open with last panels or empty', since: '2.0.25', how: 'Settings > Running queries > When Run Query opens, show', detail: 'Run Query opens with your last panels or with one empty panel. By default it learns from what you do first after it opens (Start fresh, or running the query shown) and switches when you mostly start fresh, with a notice; Reopen last panels brings the old ones back. Start fresh is the first button in the toolbar.' },
       {
         title: 'Autosave',
         detail: 'SQL is saved half a second after you stop typing, and every non-empty panel appears in the saved queries list.',

@@ -6,7 +6,7 @@ import QueryStudioNotice from '@/components/shell/QueryStudioNotice.vue'
 // (Home's "Describe the query you need", feedback #1029) opens a panel with AI Assist.
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Plus, FilePlus2, LogIn, Bookmark } from 'lucide-vue-next'
+import { Plus, FilePlus2, LogIn, Bookmark, History } from 'lucide-vue-next'
 import WorkspaceGrid from '@/components/workspace/WorkspaceGrid.vue'
 import Button from '@/components/ui/button/Button.vue'
 import { useWorkspace, LAYOUT_PRESETS } from '@/composables/useWorkspace.js'
@@ -15,6 +15,7 @@ import { showToast } from '@/composables/useToast.js'
 import { openTab } from '@/utils/openTab.js'
 import { pendingAiRequest } from '@/composables/useAi.js'
 import { coreOrigin } from '@/utils/sfmcHosts.js'
+import { loadStartPrefs, beginOpening, endOpening, noteChoice, changeNotice } from '@/utils/runQueryStart.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,14 +27,24 @@ const {
 
 const ready = ref(false)
 const canInteract = computed(() => state.value === 'connected' && !!stack.value)
+// The panels from last time when Run Query opened empty (feedback #1111).
+const previousId = ref(null)
 
 // Handles ?ws=, ?id= and ?sql=, then clears them so a reload or a later visit
 // doesn't open the same query again.
 async function applyRoute() {
   const { ws, id, sql, ai } = route.query
   if (!ready.value) {
-    await restore(typeof ws === 'string' ? ws : null)
+    // Opened for a given query or workspace: no start choice to learn from.
+    const plain = !ws && !id && !sql && !ai
+    const { start } = await loadStartPrefs()
+    const r = await restore(typeof ws === 'string' ? ws : null, { startEmpty: start === 'empty' && !ws })
+    previousId.value = r.previousId
+    if (plain && r.restoredIds.length) beginOpening('last', r.restoredIds)
+    else if (plain && r.previousId) beginOpening('empty')
     ready.value = true
+  } else if (id || sql || ws || ai) {
+    endOpening()
   }
   if (id || sql) {
     const r = await openInPanel({ id: typeof id === 'string' ? id : null, sql: typeof sql === 'string' ? sql : null })
@@ -51,6 +62,22 @@ applyRoute()
 // Fires for later visits too: a kept-alive page still sees route changes.
 watch(() => route.query, (q) => { if (ready.value && route.path === '/queries/workspace' && (q.id || q.sql || q.ws || q.ai)) applyRoute() })
 
+function learned(r) { if (r) showToast(changeNotice(r.changedTo), 9000) }
+
+async function startFresh() {
+  noteChoice('fresh').then(learned)
+  previousId.value = null
+  await newWorkspace()
+}
+
+async function reopenLast() {
+  const id = previousId.value
+  if (!id) return
+  noteChoice('kept').then(learned)
+  previousId.value = null
+  await restore(id)
+}
+
 function openLogin() {
   openTab({ url: stack.value ? `${coreOrigin(stack.value)}/cloud/` : 'https://mc.exacttarget.com' })
 }
@@ -60,6 +87,18 @@ function openLogin() {
   <div class="h-full flex flex-col bg-background">
     <div class="px-5 pt-3 empty:hidden"><QueryStudioNotice /></div>
     <div class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-border bg-card">
+      <!-- Feedback #1113: Start fresh first, filled, so it is easy to find. -->
+      <button class="h-[34px] inline-flex items-center gap-1.5 px-3.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90"
+        data-testid="start-fresh"
+        title="Start with one empty panel; the queries in the current panels stay saved (Saved queries)" @click="startFresh">
+        <FilePlus2 class="h-4 w-4" /> Start fresh
+      </button>
+      <button v-if="previousId" class="h-[34px] inline-flex items-center gap-1.5 px-3.5 rounded-full border border-primary/60 bg-card text-sm font-medium text-primary hover:bg-accent"
+        data-testid="reopen-last"
+        title="Run Query opened empty (Settings > Running queries). Bring back the panels from last time." @click="reopenLast">
+        <History class="h-4 w-4" /> Reopen last panels
+      </button>
+      <span class="h-6 w-px bg-border" aria-hidden="true"></span>
       <span class="text-[13px] text-muted-foreground">Layout</span>
       <div class="inline-flex items-center p-[3px] border border-border rounded-full bg-card" role="group" aria-label="Layout">
         <button v-for="preset in LAYOUT_PRESETS" :key="preset.label"
@@ -77,10 +116,6 @@ function openLogin() {
         <RouterLink to="/queries/saved" class="h-[34px] inline-flex items-center gap-1.5 px-3.5 rounded-full border border-border bg-card text-sm font-medium text-foreground hover:bg-accent no-underline">
           <Bookmark class="h-4 w-4" /> Saved queries
         </RouterLink>
-        <button class="h-[34px] inline-flex items-center gap-1.5 px-3.5 rounded-full border border-border bg-card text-sm font-medium text-foreground hover:bg-accent"
-          title="Start with one empty panel; the queries in the current panels stay saved" @click="newWorkspace">
-          <FilePlus2 class="h-4 w-4" /> Start fresh
-        </button>
       </span>
     </div>
 
