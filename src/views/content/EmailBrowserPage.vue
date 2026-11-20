@@ -6,11 +6,13 @@
 // %%Field%% strings itself. Read only: nothing in SFMC changes.
 // User, 2026-11-16 (ideas from VeLens): Checks (unsubscribe link, postal address, preheader,
 // text version, images, links, width, size; utils/emailChecks.js) and preview modes
-// Dark, Images off and Mobile (utils/emailPreviewModes.js).
+// Dark and Images off switches with device sizes and mail-app approximations (#1117,
+// utils/emailPreviewModes.js), plus a Mail apps check (utils/emailClientSupport.js).
 import { computed, reactive, ref, watch } from 'vue'
 import { Search, Loader2, Mail, RefreshCw, Database, CircleCheck, CircleAlert, CircleX, Info as InfoIcon } from 'lucide-vue-next'
 import { checkEmail } from '@/utils/emailChecks.js'
-import { PREVIEW_MODES, MOBILE_FRAME_WIDTH, previewHtml } from '@/utils/emailPreviewModes.js'
+import { DEVICE_PRESETS, APP_PRESETS, presetById, presetPreview, readPreviewSetting } from '@/utils/emailPreviewModes.js'
+import { mailAppGaps } from '@/utils/emailClientSupport.js'
 import Button from '@/components/ui/button/Button.vue'
 import Input from '@/components/ui/input/Input.vue'
 import SfmcErrorNotice from '@/components/results/SfmcErrorNotice.vue'
@@ -111,8 +113,9 @@ const assetLoading = ref(false)
 const assetError = ref('')
 const view = ref('preview') // preview | text | code | checks
 const MODE_KEY = 'toolkit_email_preview_mode'
-const previewMode = ref((() => { try { const m = localStorage.getItem(MODE_KEY); return PREVIEW_MODES.some((x) => x.id === m) ? m : 'normal' } catch { return 'normal' } })())
-watch(previewMode, (m) => { try { localStorage.setItem(MODE_KEY, m) } catch { /* no storage */ } })
+// { preset, dark, imagesOff }; the old single mode (normal, dark, images-off, mobile) is read too
+const preview = reactive((() => { try { return readPreviewSetting(localStorage.getItem(MODE_KEY)) } catch { return readPreviewSetting(null) } })())
+watch(preview, (v) => { try { localStorage.setItem(MODE_KEY, JSON.stringify(v)) } catch { /* no storage */ } })
 
 async function pick(row) {
   picked.value = row
@@ -258,8 +261,16 @@ watch(dataMode, (m) => {
 function clearData() { dataPreview.value = null; dataOpen.value = false }
 
 const shownHtml = computed(() => dataPreview.value?.html ?? parts.value?.html ?? '')
-const frameHtml = computed(() => previewHtml(shownHtml.value, previewMode.value))
-const modeNote = computed(() => PREVIEW_MODES.find((m) => m.id === previewMode.value)?.note || '')
+const framed = computed(() => presetPreview(shownHtml.value, preview))
+const frameHtml = computed(() => framed.value.html)
+const frameWidth = computed(() => framed.value.width)
+const shownPreset = computed(() => presetById(preview.preset))
+const modeNote = computed(() => [
+  shownPreset.value.note || (frameWidth.value ? `${frameWidth.value} pixels wide; fixed widths wider than that scroll sideways.` : ''),
+  preview.dark && !shownPreset.value.dark ? 'Dark: like mail apps that invert light colours; the email\'s own prefers-color-scheme styles apply too.' : '',
+  preview.imagesOff ? 'Images off: each image is a box with its alt text, as when a mail app blocks images.' : '',
+].filter(Boolean).join(' '))
+const gaps = computed(() => (parts.value ? mailAppGaps(shownHtml.value) : []))
 // Checks run on what is shown: with data, the filled-in email.
 const checks = computed(() => (parts.value ? checkEmail({ html: shownHtml.value, text: parts.value.text, subject: shownSubject.value, preheader: shownPreheader.value }, { textGenerated: !!asset.value?.views?.text?.generateFrom }) : null))
 const CHECK_ICON = { fail: CircleX, warn: CircleAlert, info: InfoIcon, pass: CircleCheck }
@@ -428,20 +439,38 @@ useRouteSearch('/emails', (q) => { text.value = q; searchAll.value = true; whenS
           <template v-else-if="parts">
             <div v-if="view === 'preview'" class="flex-1 min-h-[480px] p-3 flex flex-col gap-1">
               <div class="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Preview as">
-                <button v-for="m in PREVIEW_MODES" :key="m.id" type="button" class="h-7 px-2.5 rounded-full border" :aria-pressed="previewMode === m.id" :data-preview-mode="m.id"
-                  :class="previewMode === m.id ? 'bg-primary/10 border-primary text-primary' : 'border-border hover:bg-accent'" @click="previewMode = m.id">{{ m.label }}</button>
-                <span v-if="modeNote" class="text-[11px] text-muted-foreground">{{ modeNote }}</span>
+                <label class="sr-only" for="email-preview-preset">Show as</label>
+                <select id="email-preview-preset" v-model="preview.preset" class="h-7 rounded-full border border-border bg-background px-2.5 text-xs" data-preview-preset>
+                  <optgroup label="Screen size"><option v-for="p in DEVICE_PRESETS" :key="p.id" :value="p.id">{{ p.label }}</option></optgroup>
+                  <optgroup label="Mail app (approximate)"><option v-for="p in APP_PRESETS" :key="p.id" :value="p.id">{{ p.label }}</option></optgroup>
+                </select>
+                <button type="button" class="h-7 px-2.5 rounded-full border" :aria-pressed="preview.dark" data-preview-mode="dark"
+                  :class="preview.dark ? 'bg-primary/10 border-primary text-primary' : 'border-border hover:bg-accent'" @click="preview.dark = !preview.dark">Dark</button>
+                <button type="button" class="h-7 px-2.5 rounded-full border" :aria-pressed="preview.imagesOff" data-preview-mode="images-off"
+                  :class="preview.imagesOff ? 'bg-primary/10 border-primary text-primary' : 'border-border hover:bg-accent'" @click="preview.imagesOff = !preview.imagesOff">Images off</button>
+                <span v-if="gaps.length" class="text-[11px]"><button type="button" class="underline text-amber-700 dark:text-amber-300" data-gaps-link @click="view = 'checks'">{{ gaps.length }} {{ gaps.length === 1 ? 'feature' : 'features' }} some mail apps ignore</button></span>
               </div>
-              <div class="flex-1 flex justify-center" :class="previewMode === 'mobile' ? 'bg-muted/40 rounded-lg py-3' : ''">
-                <iframe :srcdoc="frameHtml" sandbox="" class="h-full min-h-[440px] rounded-lg border border-border bg-white" :style="previewMode === 'mobile' ? { width: `${MOBILE_FRAME_WIDTH}px` } : { width: '100%' }" title="Email preview" data-email-frame />
+              <p v-if="modeNote" class="text-[11px] text-muted-foreground">{{ modeNote }}</p>
+              <div class="flex-1 flex justify-center overflow-x-auto" :class="frameWidth ? 'bg-muted/40 rounded-lg py-3' : ''">
+                <iframe :srcdoc="frameHtml" sandbox="" class="min-h-[440px] shrink-0 rounded-lg border border-border bg-white" :style="frameWidth ? { width: `${frameWidth}px` } : { width: '100%' }" title="Email preview" data-email-frame />
               </div>
-              <p class="text-[11px] text-muted-foreground">Scripts do not run in the preview. Without data, AMPscript shows as written.</p>
+              <p class="text-[11px] text-muted-foreground">Scripts do not run in the preview. Without data, AMPscript shows as written. Mail apps each have their own rules, so the mail app views are approximations: a test send (or Litmus from Content Builder's Preview and Test) is the final word.</p>
             </div>
             <div v-else-if="view === 'checks' && checks" class="flex-1 p-3 space-y-2" data-email-checks>
               <p class="text-xs text-muted-foreground">
                 <strong class="text-foreground">{{ checks.counts.fail }} to fix, {{ checks.counts.warn }} to look at, {{ checks.counts.pass }} fine.</strong>
                 Checked here from the email's code{{ dataPreview ? ' as filled in with the data above' : '' }}; nothing is sent anywhere. Mail apps differ, so a test send is still the final word.
               </p>
+              <section v-if="gaps.length" class="rounded-lg border border-border bg-card" data-mail-app-gaps>
+                <h3 class="px-3 pt-2 text-sm font-semibold">Mail apps</h3>
+                <p class="px-3 pb-1 text-xs text-muted-foreground">Features in this email that some mail apps ignore (the email's Outlook-only parts are left out). A short list of well-known gaps; <a href="https://www.caniemail.com/" target="_blank" rel="noopener" class="underline">caniemail.com</a> has the full tables.</p>
+                <ul class="divide-y divide-border">
+                  <li v-for="g in gaps" :key="g.id" class="flex items-start gap-2.5 px-3 py-2" :data-gap="g.id">
+                    <CircleAlert class="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                    <div class="min-w-0"><div class="text-sm font-medium">{{ g.feature }} <span class="font-normal text-muted-foreground">({{ g.apps.join(', ') }})</span></div><div class="text-xs text-muted-foreground">{{ g.detail }}</div></div>
+                  </li>
+                </ul>
+              </section>
               <ul class="rounded-lg border border-border bg-card divide-y divide-border">
                 <li v-for="c in checks.checks" :key="c.id" class="flex items-start gap-2.5 px-3 py-2" :data-check="c.id" :data-level="c.level">
                   <component :is="CHECK_ICON[c.level]" class="h-4 w-4 mt-0.5 shrink-0" :class="CHECK_TONE[c.level]" :aria-label="c.level" />
