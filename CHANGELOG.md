@@ -4,6 +4,9 @@ All notable changes to Marketing Cloud Toolkit. Versions 2.0.0 and later are pub
 
 ## Unreleased
 
+**New:**
+- Emails > preview: Show as screen sizes (phones, tablet, desktop) and mail app views (Apple Mail on iPhone, Gmail app, Gmail on the web with clipping after about 102 KB, Outlook for Windows with its [if mso] parts and without the CSS it ignores, Outlook.com), combined with the Dark and Images off switches; Checks lists features some mail apps ignore. All in the browser, labelled approximations (feedback #1117).
+
 **Changed:**
 - Run Query opens with your last panels or one empty panel (Settings > Running queries); by default it learns which from what you do first after it opens, and Reopen last panels brings the old ones back (feedback #1111). Start fresh is now the first button in the toolbar (feedback #1113).
 - Feedback: a question needs an email, since it cannot be answered otherwise (feedback #1112); I like it opens the Chrome Web Store review page, where reviews are public (feedback #1114).

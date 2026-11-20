@@ -12,6 +12,12 @@ export const TO_TEST = [
     status: 'Not released: test builds only',
     items: [
       {
+        id: '2.0.25-email-app-previews', area: 'Content', title: 'Email preview as phones, tablet and mail apps', ref: '#1117', live: false,
+        where: 'Content > Emails > an email > Preview, and Checks',
+        steps: ['Open an email that has rounded buttons or Outlook-only ([if mso]) parts.', 'In Show as, pick Phone, then Outlook, Windows, then Gmail, web.', 'Turn Dark and Images off on and off with each.', 'Click the "features some mail apps ignore" link.'],
+        expect: 'Phones and Gmail app show a narrow frame; Outlook, Windows shows the Outlook-only parts and square corners; Gmail, web shows [Message clipped] for emails over about 102 KB; Dark and Images off apply on top. Checks has a Mail apps section naming the apps for each feature. Your choice is remembered next time.',
+      },
+      {
         id: '2.0.25-run-query-start', area: 'Queries', title: 'What Run Query opens with, learned from use', ref: '#1111', from: 'Foram', live: false,
         where: 'Queries > Run Query; Settings > Running queries > When Run Query opens, show',
         steps: ['With a query in a panel, open a new Toolkit tab on Run Query and click Start fresh. Do this 3 times.', 'Open a new Toolkit tab on Run Query.', 'Click Reopen last panels.', 'In Settings, pick My last panels, then One empty panel, and open Run Query each time.'],
