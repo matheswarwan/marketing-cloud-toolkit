@@ -12,6 +12,18 @@ export const TO_TEST = [
     status: 'Not released: test builds only',
     items: [
       {
+        id: '2.0.25-where-used-unqualified', area: 'Data', title: 'Where used finds fields read without a table prefix', ref: '#1106', from: 'Mathes, for a user', live: true,
+        where: 'Data > Where used > Field (or Data Extensions > a DE > Fields > Where used)',
+        steps: ['Pick a field of a DE that a query reads in a multi-table query without a prefix (for example SELECT BounceCategory FROM _Bounce b JOIN MyDE m ON ...).', 'Search for a data view field, for example _Bounce.BounceCategory.', 'Look for a query that writes a column with the same name only after AS.'],
+        expect: 'The unprefixed read is listed as Reads (not Maybe reads) when the field exists in only one of the tables; data view fields can be searched; a name that appears only after AS is not counted as a read.',
+      },
+      {
+        id: '2.0.25-where-used-full-screen', area: 'Data', title: 'Where used results: Full screen and Open in new tab', ref: 'user, 2026-11-18', from: 'Mathes', live: true,
+        where: 'Data > Where used, after a search',
+        steps: ['Run a Where used search.', 'Click Full screen, then Esc.', 'Click Open in new tab.'],
+        expect: 'Full screen shows the results over the page; the new tab opens the same results on their own page (#/where-used/result) without searching again.',
+      },
+      {
         id: '2.0.25-run-query-start', area: 'Queries', title: 'What Run Query opens with, learned from use', ref: '#1111', from: 'Foram', live: false,
         where: 'Queries > Run Query; Settings > Running queries > When Run Query opens, show',
         steps: ['With a query in a panel, open a new Toolkit tab on Run Query and click Start fresh. Do this 3 times.', 'Open a new Toolkit tab on Run Query.', 'Click Reopen last panels.', 'In Settings, pick My last panels, then One empty panel, and open Run Query each time.'],
@@ -137,6 +149,18 @@ export const TO_TEST = [
     version: '2.0.23',
     status: 'On main, not packaged',
     items: [
+      {
+        id: '2.0.23-preview-data-page', area: 'Data Extensions', title: 'Preview data on its own page, last N rows', ref: '#1097', from: 'Mathes', live: true,
+        where: 'Data > Data Extensions > a DE > Preview data',
+        steps: ['Open Preview data, then open it in a new tab.', 'Click Load 50k rows.', 'Use Load last N rows with 100.'],
+        expect: 'Preview data is its own page (works in a new tab); Load 50k rows reads up to 50,000 rows; Load last N rows shows the newest 100 rows.',
+      },
+      {
+        id: '2.0.23-where-used-de-links', area: 'Data', title: 'Where used results open their data extension', ref: '#1098', from: 'a user (no name given)', live: true,
+        where: 'Data > Where used, or Activities > Where used',
+        steps: ['Run a Where used search for an activity or DE.', 'Click a data extension name in the results.'],
+        expect: 'Data extension names in the results are links that open the data extension.',
+      },
       {
         id: '2.0.23-content-cleanup', area: 'Content', title: 'Content Builder clean-up report', ref: 'API idea 18', from: 'Mathes', live: true,
         where: 'Content > Clean-up report',
