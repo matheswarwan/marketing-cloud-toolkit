@@ -12,6 +12,12 @@ export const TO_TEST = [
     status: 'Not released: test builds only',
     items: [
       {
+        id: '2.0.25-attribute-set-tables', area: 'Queries', title: 'Attribute set names used as tables', ref: '#1105', from: 'a user (no name given)', live: false,
+        where: 'Queries > Run Query',
+        steps: ['Run SELECT TOP 10 * FROM [Contact]', 'Run SELECT TOP 10 * FROM [Email]', 'Run a query on a misspelled data extension name.'],
+        expect: 'For Contact and Email the explanation says these are Contact Builder attribute sets that Query Studio cannot read, and points to _Subscribers or the data extension behind the set (Data > Data model, Query this set). A misspelled name still gets the old advice (typo, ENT.).',
+      },
+      {
         id: '2.0.25-automation-paging', area: 'Automation', title: 'Automations past 100', ref: '#1100', from: 'a user (no name given)', live: false,
         where: 'Automation > Automations; Automation overview',
         steps: ['In an account with more than 100 automations, search with an empty box.', 'Click Load more until it stops.'],
