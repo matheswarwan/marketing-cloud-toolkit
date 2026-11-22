@@ -353,7 +353,7 @@ function openSchema() {
           <Play class="h-3 w-3 fill-current" /><span class="tb-label">Run</span><kbd class="tb-label font-sans text-[10px] opacity-85">{{ runShortcut }}</kbd>
         </button>
         <button type="button" :class="[iconPill, activeTab === 'history' ? 'bg-accent' : '']" :aria-pressed="activeTab === 'history'" :title="activeTab === 'history' ? 'Back to editor' : 'Run history'" @click="activeTab = activeTab === 'history' ? 'editor' : 'history'"><History class="h-4 w-4" /></button>
-        <button type="button" :class="iconPill" :title="isExpanded ? 'Minimize panel' : 'Expand panel'" @click="$emit('expand')">
+        <button type="button" :class="iconPill" :title="isExpanded ? 'Leave full screen (Esc)' : 'Full screen'" :aria-label="isExpanded ? 'Leave full screen' : 'Full screen'" :aria-pressed="isExpanded" @click="$emit('expand')">
           <Minimize2 v-if="isExpanded" class="h-4 w-4" />
           <Maximize2 v-else class="h-4 w-4" />
         </button>

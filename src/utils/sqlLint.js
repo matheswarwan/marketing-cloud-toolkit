@@ -1731,6 +1731,25 @@ function rulePushJoin(ctx) {
   return out
 }
 
+// QS066: *= and =* (the old outer join operators, feedback #1121). SFMC refuses the query with
+// "Old style JOIN (ANSI JOINs) syntax is not allowed", the same message as a comma join (QS046).
+// No automatic fix: the rewrite to LEFT / RIGHT JOIN ... ON moves the condition out of WHERE.
+function ruleOldOuterJoin(ctx) {
+  const { sig } = ctx
+  const out = []
+  for (let i = 0; i < sig.length; i++) {
+    const t = sig[i]
+    const n = sig[i + 1]
+    let side = null
+    let end = t
+    if (t.type === 'op' && t.value === '*=') side = 'LEFT'
+    else if (t.type === 'op' && t.value === '=' && n?.type === 'op' && n.value === '*' && n.start === t.end) { side = 'RIGHT'; end = n }
+    if (!side) continue
+    out.push({ ...span(t, end), message: `${side === 'LEFT' ? '*=' : '=*'} is the old outer join operator, which SFMC refuses ("Old style JOIN (ANSI JOINs) syntax is not allowed"). Write it as ${side} JOIN <table> ON <condition>.` })
+  }
+  return out
+}
+
 // QS065: an ntext column (_Job.DynamicEmailSubject) where SQL Server has to compare
 // values: SELECT DISTINCT, UNION / EXCEPT / INTERSECT without ALL, GROUP BY, ORDER BY.
 // SFMC refuses the query ("The ntext data type cannot be selected as DISTINCT because it
@@ -1853,6 +1872,7 @@ const RULES = [
   { code: 'QS063', severity: 'warning', title: 'WHERE on a LEFT JOIN table makes it an INNER JOIN', check: ruleLeftJoinFilteredInWhere },
   { code: 'QS064', severity: 'warning', title: '_PushTag and _PushAddress joined without _APID', check: rulePushJoin },
   { code: 'QS065', severity: 'error', title: 'ntext column in DISTINCT, UNION, GROUP BY or ORDER BY', check: ruleNtextCompared },
+  { code: 'QS066', severity: 'error', title: 'Old outer join operator *= or =*', check: ruleOldOuterJoin },
 ]
 
 /** Every rule, for a settings or help list. */

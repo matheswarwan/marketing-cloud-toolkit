@@ -35,3 +35,12 @@ describe('ntext errors (feedback #1085)', () => {
     expect(explainRunError('The data types ntext and varchar are incompatible in the equal to operator.').fix).toMatch(/CAST/)
   })
 })
+
+describe('old style join error (feedback #1121)', () => {
+  it('explains the SFMC message', () => {
+    const msg = 'An error occurred while checking the query syntax. Errors: Old style JOIN (ANSI JOINs) syntax is not allowed. Please use standard syntax.'
+    const r = explainRunError(msg, 'SELECT a.x FROM a, b WHERE a.id = b.id')
+    expect(r.cause).toMatch(/commas in FROM/)
+    expect(r.fix).toMatch(/INNER JOIN/)
+  })
+})
