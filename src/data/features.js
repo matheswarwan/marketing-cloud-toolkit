@@ -152,7 +152,7 @@ export const FEATURE_GROUPS = [
       {
         title: 'SFMC checks as you type',
         how: 'Underlines and gutter markers; hover to read them',
-        detail: '65 rules catch what SFMC rejects or handles badly: more than one statement, variables, temp tables, WITH, a computed column without an alias, duplicate column names, ORDER BY in a subquery without TOP, = NULL, NOT IN with a subquery, a tracking data view without a date filter, functions SFMC does not support, and more. Each message shows its rule code (QS001 and so on). SELECT * is allowed.',
+        detail: '66 rules catch what SFMC rejects or handles badly: more than one statement, variables, temp tables, WITH, a computed column without an alias, duplicate column names, ORDER BY in a subquery without TOP, = NULL, NOT IN with a subquery, a tracking data view without a date filter, functions SFMC does not support, and more. Each message shows its rule code (QS001 and so on). SELECT * is allowed.',
       },
       {
         title: 'One-click fixes',

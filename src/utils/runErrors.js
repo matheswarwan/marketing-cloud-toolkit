@@ -105,6 +105,11 @@ const RULES = [
     fix: 'Add it to GROUP BY, or wrap it in MAX(...) / MIN(...).',
   },
   {
+    test: /old style join|ANSI JOINs?\)? syntax is not allowed/i,
+    cause: 'The query joins tables the old way: tables separated by commas in FROM (FROM a, b WHERE a.id = b.id), or the *= / =* outer join operators. SFMC only accepts JOIN ... ON.',
+    fix: 'Write FROM a INNER JOIN b ON a.id = b.id (LEFT JOIN for *=, RIGHT JOIN for =*) and take the join condition out of WHERE. The red QS046 / QS066 marks in the editor show where.',
+  },
+  {
     test: /no column name was specified for column/i,
     cause: 'An expression in SELECT has no name; SFMC needs a name for every column to write it to the data extension.',
     fix: 'Add AS [Name] after the expression.',

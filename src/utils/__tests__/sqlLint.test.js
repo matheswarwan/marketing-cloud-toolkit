@@ -735,3 +735,17 @@ describe('QS065 ntext columns compared (feedback #1085)', () => {
     expect(q('SELECT TOP 5 CAST(DynamicEmailSubject AS NVARCHAR(4000)) AS DynamicEmailSubject FROM _Job ORDER BY DynamicEmailSubject')).toHaveLength(0)
   })
 })
+
+describe('QS066 old outer join operators (feedback #1121)', () => {
+  const q = (text) => lintSql(text).filter((d) => d.code === 'QS066')
+  it('flags *= and =*', () => {
+    expect(q('SELECT a.x FROM a JOIN b ON a.id *= b.id')).toHaveLength(1)
+    expect(q('SELECT a.x FROM a JOIN b ON a.id*=b.id')[0].message).toMatch(/LEFT JOIN/)
+    expect(q('SELECT a.x FROM a JOIN b ON a.id =* b.id')[0].message).toMatch(/RIGHT JOIN/)
+  })
+  it('leaves stars and equals alone', () => {
+    expect(q('SELECT * FROM a WHERE a.id = 3')).toHaveLength(0)
+    expect(q('SELECT COUNT(*) AS n FROM a HAVING COUNT(*) = 2')).toHaveLength(0)
+    expect(q('SELECT a.x * 2 AS y FROM a WHERE a.n = 2 * a.m')).toHaveLength(0)
+  })
+})

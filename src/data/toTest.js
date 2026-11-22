@@ -12,6 +12,18 @@ export const TO_TEST = [
     status: 'Not released: test builds only',
     items: [
       {
+        id: '2.0.25-full-screen-panel', area: 'Queries', title: 'Run Query panel full screen', ref: '#1122', from: 'Mathes', live: false,
+        where: 'Queries > Run Query, the Full screen button (arrows) on a panel',
+        steps: ['With two panels, click Full screen on one.', 'Open Save, Ask AI and a toolbar menu while full screen, then close them with Esc.', 'Press Esc again, then try the button.'],
+        expect: 'The panel covers the whole window: no sidebar, no top bar, no other panel. Dialogs and menus open on top of it, and the first Esc only closes them. The next Esc (or the button) brings the normal layout back, with the other panel still there.',
+      },
+      {
+        id: '2.0.25-old-style-join', area: 'Queries', title: 'Old style JOIN error explained', ref: '#1121', from: 'Mathes', live: true,
+        where: 'Queries > Run Query',
+        steps: ['Run SELECT a.SubscriberKey FROM _Sent a, _Open b WHERE a.JobID = b.JobID (turn QS046 off in Settings > Lint rules first, or run it anyway).', 'Type a.JobID *= b.JobID in a join condition.'],
+        expect: 'The failed run step shows SFMC\'s message with Likely cause (commas in FROM, or *= / =*) and Fix (INNER JOIN ... ON, LEFT JOIN for *=, RIGHT JOIN for =*). *= gets a red QS066 mark in the editor.',
+      },
+      {
         id: '2.0.25-run-query-start', area: 'Queries', title: 'What Run Query opens with, learned from use', ref: '#1111', from: 'Foram', live: false,
         where: 'Queries > Run Query; Settings > Running queries > When Run Query opens, show',
         steps: ['With a query in a panel, open a new Toolkit tab on Run Query and click Start fresh. Do this 3 times.', 'Open a new Toolkit tab on Run Query.', 'Click Reopen last panels.', 'In Settings, pick My last panels, then One empty panel, and open Run Query each time.'],

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import QueryPanel from './QueryPanel.vue'
 
 const props = defineProps({
@@ -26,8 +26,10 @@ const rowSizes = ref(even(props.layoutRows))
 watch(() => props.layoutCols, (n) => { colSizes.value = even(n); expandedId.value = null })
 watch(() => props.layoutRows, (n) => { rowSizes.value = even(n); expandedId.value = null })
 
-// Expand-in-place: the expanded panel fills the grid, the rest are hidden
-// (never unmounted — an in-progress run in another panel must keep polling).
+// Expand: the expanded panel covers the whole window (sidebar and header hidden, #1122), the other
+// panels are hidden (never unmounted: an in-progress run in another panel must keep polling).
+// The layer sits below dialogs (z-50) so Save, Share, Ask AI and the rest still open on top.
+// Escape leaves it unless something inside used the key (an open menu, dialog or autocomplete).
 const expandedId = ref(null)
 function toggleExpand(queryId) {
   expandedId.value = expandedId.value === queryId ? null : queryId
@@ -35,6 +37,16 @@ function toggleExpand(queryId) {
 watch(() => props.panels, (list) => {
   if (expandedId.value && !list.some(p => p.queryId === expandedId.value)) expandedId.value = null
 })
+function leaveOnEscape(e) {
+  if (e.key !== 'Escape' || e.defaultPrevented || !expandedId.value) return
+  if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return
+  expandedId.value = null
+}
+watch(expandedId, (id) => {
+  if (id) window.addEventListener('keydown', leaveOnEscape)
+  else window.removeEventListener('keydown', leaveOnEscape)
+})
+onBeforeUnmount(() => window.removeEventListener('keydown', leaveOnEscape))
 
 const gridStyle = computed(() => ({
   display: 'grid',
@@ -103,7 +115,11 @@ function endDrag() {
 </script>
 
 <template>
-  <div class="workspace-grid flex-1 min-h-0 p-3 sm:p-5 bg-background">
+  <div
+    class="workspace-grid bg-background"
+    :class="expandedId ? 'fixed inset-0 z-[45] flex flex-col p-2 sm:p-3' : 'flex-1 min-h-0 p-3 sm:p-5'"
+    :data-full-screen="expandedId ? '' : null"
+  >
     <div ref="gridRef" class="relative w-full h-full" :style="gridStyle">
       <QueryPanel
         v-for="(panel, idx) in panels"
